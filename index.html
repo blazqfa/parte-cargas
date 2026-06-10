@@ -273,6 +273,16 @@ tbody tr:last-child td{border-bottom:none;}
 .col-filter-search{padding:6px 10px;border-bottom:1px solid var(--border);display:flex;gap:4px;}
 .col-filter-search input{border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;width:100%;outline:none;font-family:var(--font);}
 .col-filter-actions{padding:6px 10px;border-top:1px solid var(--border);display:flex;gap:6px;justify-content:flex-end;}
+
+.act-menu-wrap{position:relative;display:inline-block;}
+.act-menu-btn{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text);font-family:var(--font);white-space:nowrap;}
+.act-menu-btn:hover{border-color:var(--c1);color:var(--c1);}
+.act-menu-dropdown{display:none;position:absolute;right:0;top:calc(100% + 4px);z-index:600;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.15);min-width:160px;padding:4px 0;}
+.act-menu-dropdown.open{display:block;}
+.act-menu-item{padding:8px 14px;font-size:12px;cursor:pointer;color:var(--text);white-space:nowrap;display:flex;align-items:center;gap:8px;}
+.act-menu-item:hover{background:var(--bg3);}
+.act-menu-item.danger{color:var(--urgent);}
+.act-menu-item.danger:hover{background:#fde8ee;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
 
@@ -501,7 +511,7 @@ async function confirmarImport(){
 
 
 // ── COLUMN FILTERS ────────────────────────────────────────────────
-const COL_FILTER_COLS = ['consegna','refcarga','cliente','estado','fentrega','fcarga','agencia','asignado','negocio'];
+const COL_FILTER_COLS = ['consegna','refcarga','cliente','estado','fentrega','fcarga','fllegada','tipocamion','agencia','asignado','negocio'];
 let _colFilters = {}; // {col: Set of selected values}
 
 function getColValues(col){
@@ -578,6 +588,89 @@ function _updateColFilterBtn(col){
   btn.textContent = (_colFilters[col]&&_colFilters[col].size>0) ? '▾●' : '▾';
 }
 
+
+function toggleActMenu(id, e){
+  e.stopPropagation();
+  closeActMenus();
+  const m=document.getElementById('actmenu-'+id);
+  if(m) m.classList.toggle('open');
+  setTimeout(function(){ document.addEventListener('click', function h(){ closeActMenus(); document.removeEventListener('click',h); }); },0);
+}
+function closeActMenus(){
+  document.querySelectorAll('.act-menu-dropdown.open').forEach(function(m){ m.classList.remove('open'); });
+}
+
+
+// ── HISTORICO COLUMN FILTERS ──────────────────────────────────────
+const HIST_FILTER_COLS = ['consegna','refcarga','cliente','estado','fllegada','fentrega','fcarga','agencia','asignado','negocio','tipocamion','finalizadoEn'];
+let _histColFilters = {};
+
+function getHistColValues(col){
+  const vals=new Set();
+  _histData.forEach(function(e){
+    var v=col==='consegna'?(e.consegnas||[e.consegna]).filter(Boolean)[0]||'':String(e[col]||'');
+    if(v) vals.add(v);
+  });
+  return [...vals].sort();
+}
+
+function toggleHistFilter(col){
+  HIST_FILTER_COLS.forEach(function(c){ if(c!==col){ var d=document.getElementById('hcfd-'+c); if(d) d.classList.remove('open'); } });
+  var dd=document.getElementById('hcfd-'+col);
+  if(!dd) return;
+  if(dd.classList.contains('open')){ dd.classList.remove('open'); return; }
+  var selected=_histColFilters[col]||new Set();
+  var vals=getHistColValues(col);
+  var h='<div class="col-filter-search"><input placeholder="Buscar..." id="hcfs-'+col+'" style="border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;width:100%;outline:none;"/></div>';
+  h+='<div id="hcflist-'+col+'">';
+  h+='<div class="col-filter-item"><input type="checkbox" id="hcfall-'+col+'"'+(selected.size===0?' checked':'')+'/> <label style="cursor:pointer" for="hcfall-'+col+'">(Todos)</label></div>';
+  vals.forEach(function(v){
+    var esc=v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    h+='<div class="col-filter-item" data-val="'+esc+'"><input type="checkbox"'+(selected.has(v)?' checked':'')+'/> <span>'+esc+'</span></div>';
+  });
+  h+='</div><div class="col-filter-actions"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:3px 8px">✕ Limpiar</button></div>';
+  dd.innerHTML=h;
+  dd.classList.add('open');
+  var si=document.getElementById('hcfs-'+col);
+  if(si) si.addEventListener('input',function(){ 
+    var q=this.value.toLowerCase();
+    document.querySelectorAll('#hcflist-'+col+' .col-filter-item[data-val]').forEach(function(item){
+      item.style.display=(item.querySelector('span')?.textContent||'').toLowerCase().includes(q)?'':'none';
+    });
+  });
+  var ac=document.getElementById('hcfall-'+col);
+  if(ac) ac.addEventListener('change',function(){
+    delete _histColFilters[col];
+    _updateHistFilterBtn(col);
+    dd.classList.remove('open');
+    filtrarHistorico();
+  });
+  document.querySelectorAll('#hcflist-'+col+' .col-filter-item[data-val]').forEach(function(item){
+    var cb=item.querySelector('input[type=checkbox]');
+    var v=item.dataset.val;
+    if(cb) cb.addEventListener('change',function(){
+      if(!_histColFilters[col]) _histColFilters[col]=new Set();
+      if(this.checked) _histColFilters[col].add(v); else _histColFilters[col].delete(v);
+      if(_histColFilters[col].size===0) delete _histColFilters[col];
+      _updateHistFilterBtn(col);
+      filtrarHistorico();
+    });
+  });
+  var clrBtn=dd.querySelector('.col-filter-actions button');
+  if(clrBtn) clrBtn.addEventListener('click',function(){
+    delete _histColFilters[col]; _updateHistFilterBtn(col); dd.classList.remove('open'); filtrarHistorico();
+  });
+  setTimeout(function(){ document.addEventListener('click',function hh(ev){ if(!dd.contains(ev.target)){ dd.classList.remove('open'); document.removeEventListener('click',hh); } }); },0);
+}
+
+function _updateHistFilterBtn(col){
+  var btn=document.getElementById('hcfbtn-'+col);
+  if(!btn) return;
+  var active=!!_histColFilters[col]&&_histColFilters[col].size>0;
+  btn.classList.toggle('active',active);
+  btn.textContent=active?'▾●':'▾';
+}
+
 </script>
 </head>
 <body>
@@ -648,22 +741,7 @@ function _updateColFilterBtn(col){
     <div class="section-header">
       <div class="section-title">Expediciones activas</div>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
-        <select class="form-select" id="filtro-estado" onchange="renderTabla()" style="width:auto;padding:6px 10px;font-size:13px;">
-          <option value="">Todos los estados</option>
-          <option>PTE. DE CONSEGNA</option>
-          <option>SIN ORDEN</option>
-          <option>EN CURSO</option>
-          <option>CONSEÑADO</option>
-          <option>CARGANDO EN EL MUELLE</option>
-          <option>INCIDENCIA</option>
-        </select>
-        <select class="form-select" id="filtro-asignado" onchange="renderTabla()" style="width:auto;padding:6px 10px;font-size:13px;">
-          <option value="">Todos los asignados</option>
-          <option>LOURDES</option><option>DAVID</option><option>MARIOLA</option>
-          <option>JOSE MANUEL</option><option>ORIANA</option>
-        </select>
-      </div>
-    </div>
+        </div></div>
 
     <!-- KPI CARDS -->
     <div class="kpi-row">
@@ -710,6 +788,8 @@ function _updateColFilterBtn(col){
             <th onclick="setSort('estado')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-estado">Estado <span id="sort-icon-estado"></span><span class="col-filter-btn" id="cfbtn-estado" onclick="event.stopPropagation();toggleColFilter('estado')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-estado"></div></th>
             <th onclick="setSort('fentrega')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-fentrega">F. Entrega <span id="sort-icon-fentrega"></span><span class="col-filter-btn" id="cfbtn-fentrega" onclick="event.stopPropagation();toggleColFilter('fentrega')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-fentrega"></div></th>
             <th onclick="setSort('fcarga')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-fcarga">F. Carga <span id="sort-icon-fcarga"></span><span class="col-filter-btn" id="cfbtn-fcarga" onclick="event.stopPropagation();toggleColFilter('fcarga')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-fcarga"></div></th>
+            <th onclick="setSort('fllegada')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-fllegada">F. Llegada <span id="sort-icon-fllegada"></span><span class="col-filter-btn" id="cfbtn-fllegada" onclick="event.stopPropagation();toggleColFilter('fllegada')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-fllegada"></div></th>
+            <th onclick="setSort('tipocamion')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-tipocamion">Tipo Camión <span id="sort-icon-tipocamion"></span><span class="col-filter-btn" id="cfbtn-tipocamion" onclick="event.stopPropagation();toggleColFilter('tipocamion')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-tipocamion"></div></th>
             <th onclick="setSort('agencia')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-agencia">Agencia <span id="sort-icon-agencia"></span><span class="col-filter-btn" id="cfbtn-agencia" onclick="event.stopPropagation();toggleColFilter('agencia')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-agencia"></div></th>
             <th onclick="setSort('asignado')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-asignado">Asignado <span id="sort-icon-asignado"></span><span class="col-filter-btn" id="cfbtn-asignado" onclick="event.stopPropagation();toggleColFilter('asignado')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-asignado"></div></th>
             <th onclick="setSort('negocio')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-negocio">Negocio <span id="sort-icon-negocio"></span><span class="col-filter-btn" id="cfbtn-negocio" onclick="event.stopPropagation();toggleColFilter('negocio')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-negocio"></div></th>
@@ -972,22 +1052,23 @@ function _updateColFilterBtn(col){
       <table id="tabla-historico" style="min-width:1400px;">
         <thead>
           <tr>
-            <th class="th-sort" onclick="sortHist('consegna')">Consegna <span id="hsi-consegna"></span></th>
-            <th class="th-sort" onclick="sortHist('refcarga')">OT (Ref.Carga) <span id="hsi-refcarga"></span></th>
-            <th class="th-sort" onclick="sortHist('cliente')">Cliente <span id="hsi-cliente"></span></th>
-            <th class="th-sort" onclick="sortHist('estado')">Estado <span id="hsi-estado"></span></th>
-            <th class="th-sort" onclick="sortHist('fllegada')">F.Llegada <span id="hsi-fllegada"></span></th>
-            <th class="th-sort" onclick="sortHist('fentrega')">F.Entrega <span id="hsi-fentrega"></span></th>
-            <th class="th-sort" onclick="sortHist('fcarga')">F.Carga <span id="hsi-fcarga"></span></th>
+            <th class="th-sort" onclick="sortHist('consegna')" style="position:relative;">Consegna <span id="hsi-consegna"></span><span class="col-filter-btn" id="hcfbtn-consegna" onclick="event.stopPropagation();toggleHistFilter('consegna')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-consegna"></div></th>
+            <th class="th-sort" onclick="sortHist('refcarga')" style="position:relative;">OT (Ref.Carga) <span id="hsi-refcarga"></span><span class="col-filter-btn" id="hcfbtn-refcarga" onclick="event.stopPropagation();toggleHistFilter('refcarga')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-refcarga"></div></th>
+            <th class="th-sort" onclick="sortHist('cliente')" style="position:relative;">Cliente <span id="hsi-cliente"></span><span class="col-filter-btn" id="hcfbtn-cliente" onclick="event.stopPropagation();toggleHistFilter('cliente')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-cliente"></div></th>
+            <th class="th-sort" onclick="sortHist('estado')" style="position:relative;">Estado <span id="hsi-estado"></span><span class="col-filter-btn" id="hcfbtn-estado" onclick="event.stopPropagation();toggleHistFilter('estado')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-estado"></div></th>
+            <th class="th-sort" onclick="sortHist('fllegada')" style="position:relative;">F.Llegada <span id="hsi-fllegada"></span><span class="col-filter-btn" id="hcfbtn-fllegada" onclick="event.stopPropagation();toggleHistFilter('fllegada')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-fllegada"></div></th>
+            <th class="th-sort" onclick="sortHist('fentrega')" style="position:relative;">F.Entrega <span id="hsi-fentrega"></span><span class="col-filter-btn" id="hcfbtn-fentrega" onclick="event.stopPropagation();toggleHistFilter('fentrega')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-fentrega"></div></th>
+            <th class="th-sort" onclick="sortHist('fcarga')" style="position:relative;">F.Carga <span id="hsi-fcarga"></span><span class="col-filter-btn" id="hcfbtn-fcarga" onclick="event.stopPropagation();toggleHistFilter('fcarga')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-fcarga"></div></th>
             <th>F.Trans.</th>
-            <th class="th-sort" onclick="sortHist('agencia')">Agencia <span id="hsi-agencia"></span></th>
-            <th class="th-sort" onclick="sortHist('asignado')">Asignado <span id="hsi-asignado"></span></th>
-            <th class="th-sort" onclick="sortHist('negocio')">Negocio <span id="hsi-negocio"></span></th>
+            <th class="th-sort" onclick="sortHist('agencia')" style="position:relative;">Agencia <span id="hsi-agencia"></span><span class="col-filter-btn" id="hcfbtn-agencia" onclick="event.stopPropagation();toggleHistFilter('agencia')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-agencia"></div></th>
+            <th class="th-sort" onclick="sortHist('asignado')" style="position:relative;">Asignado <span id="hsi-asignado"></span><span class="col-filter-btn" id="hcfbtn-asignado" onclick="event.stopPropagation();toggleHistFilter('asignado')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-asignado"></div></th>
+            <th class="th-sort" onclick="sortHist('negocio')" style="position:relative;">Negocio <span id="hsi-negocio"></span><span class="col-filter-btn" id="hcfbtn-negocio" onclick="event.stopPropagation();toggleHistFilter('negocio')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-negocio"></div></th>
             <th>Tipo camión</th><th>Pallets</th><th>Destino</th><th>Lugar carga</th>
             <th>H.Carga</th><th>H.Llegada</th><th>H.Salida</th>
             <th>Peso</th><th>Contenedor</th><th>Precinto</th>
             <th>Conductor</th><th>DNI</th><th>Empresa trans.</th><th>Matrícula</th><th>Remolque</th>
-            <th>Notas</th><th class="th-sort" onclick="sortHist('finalizadoEn')">F. Finalizado <span id="hsi-finalizadoEn"></span></th>
+            <th>Orden</th><th>Artículo</th><th>Línea</th><th>Núm. PZ</th>
+            <th>Notas</th><th class="th-sort" onclick="sortHist('finalizadoEn')" style="position:relative;">F. Finalizado <span id="hsi-finalizadoEn"></span><span class="col-filter-btn" id="hcfbtn-finalizadoEn" onclick="event.stopPropagation();toggleHistFilter('finalizadoEn')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-finalizadoEn"></div></th>
           </tr>
         </thead>
         <tbody id="tbody-historico"></tbody>
@@ -1105,7 +1186,7 @@ function _updateColFilterBtn(col){
     <div id="modal-trans-content"></div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('modal-trans-detail')">Cerrar</button>
-      <button class="btn btn-accent" id="btn-print-ficha" onclick="imprimirFichaConductor()">🖨 Imprimir ficha conductor</button>
+      <button class="btn btn-accent" id="btn-print-ficha" onclick="imprimirFichaConductor(document.getElementById('btn-print-ficha').dataset.envioId)">🖨 Imprimir ficha conductor</button>
     </div>
   </div>
 </div>
@@ -1547,7 +1628,7 @@ function renderTabla(){
   const canEdit=currentPermisos.editar||currentRol==='ADMINISTRADOR'||currentRol==='VENTANILLA';
   const canDelete=currentPermisos.eliminar||currentRol==='ADMINISTRADOR'||currentRol==='VENTANILLA';
   const tbody=document.getElementById('tbody-principal');
-  if(!envios.length){tbody.innerHTML='<tr><td colspan="11"><div class="empty-state"><h3>No hay expediciones activas</h3></div></td></tr>';return;}
+  if(!envios.length){tbody.innerHTML='<tr><td colspan="13"><div class="empty-state"><h3>No hay expediciones activas</h3></div></td></tr>';return;}
   tbody.innerHTML=envios.map(e=>{
     const cls=ESTADO_CLS[e.estado]||'est-PTE';
     const isOpen=expandedRows.has(e.id);
@@ -1564,16 +1645,24 @@ function renderTabla(){
       <td>${estadoCell}</td>
       <td><span class="semaforo">${sem}<span>${e.fentrega||'—'}</span></span></td>
       <td>${e.fcarga||'—'}</td>
+      <td>${e.fllegada||'—'}</td>
+      <td>${e.tipocamion||'—'}</td>
       <td>${e.agencia||'—'}</td>
       <td>${e.asignado||'—'}</td>
       <td>${e.negocio||'—'}</td>
-      <td><div style="display:flex;gap:4px;flex-wrap:wrap;">
-        ${canEdit?`<button class="btn btn-xs" onclick="editarEnvio('${e.id}')">✎ Editar</button>`:''}
-        ${e.transportista?`<button class="btn btn-xs" onclick="verTransportista('${e.id}')">🚛 Trans.</button>`:''}
-        ${canDelete?`<button class="btn btn-xs btn-danger" onclick="eliminarEnvio('${e.id}')">✕ Eliminar</button>`:''}
-      </div></td>
+      <td style="position:relative;">
+        <div class="act-menu-wrap">
+          <button class="act-menu-btn" onclick="toggleActMenu('${e.id}',event)">Acciones ▾</button>
+          <div class="act-menu-dropdown" id="actmenu-${e.id}">
+            ${canEdit?`<div class="act-menu-item" onclick="editarEnvio('${e.id}');closeActMenus()">✎ Editar</div>`:''}
+            ${canDelete?`<div class="act-menu-item danger" onclick="eliminarEnvio('${e.id}');closeActMenus()">✕ Eliminar</div>`:''}
+            ${e.transportista?`<div class="act-menu-item" onclick="verTransportista('${e.id}');closeActMenus()">🚛 Ver transportista</div>`:''}
+            ${e.transportista?`<div class="act-menu-item" onclick="imprimirFichaConductor('${e.id}');closeActMenus()">🖨 Ficha conductor</div>`:''}
+          </div>
+        </div>
+      </td>
     </tr>`;
-    const expandRow=isOpen?`<tr class="expand-row"><td colspan="11">
+    const expandRow=isOpen?`<tr class="expand-row"><td colspan="13">
       <div class="expand-grid">
         <div class="expand-item"><span class="expand-label">Consegna(s)</span><span class="expand-val">${(e.consegnas||[e.consegna]).filter(Boolean).join(', ')||'—'}</span></div>
         <div class="expand-item"><span class="expand-label">F. Llegada pedido</span><span class="expand-val">${e.fllegada||'—'}</span></div>
@@ -1767,7 +1856,8 @@ function verTransportista(id){
   document.getElementById('modal-trans-detail').classList.add('open');
 }
 
-function imprimirFichaConductor(){
+function imprimirFichaConductor(envioId){
+  if(!envioId) envioId = document.getElementById('btn-print-ficha')?.dataset.envioId;
   const id = document.getElementById('btn-print-ficha').dataset.envioId;
   const e  = _enviosCache.find(x=>x.id===id);
   if(!e) return;
@@ -1810,6 +1900,16 @@ function imprimirFichaConductor(){
     }
   
 /* Column filter dropdowns */
+
+.act-menu-wrap{position:relative;display:inline-block;}
+.act-menu-btn{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text);font-family:var(--font);white-space:nowrap;}
+.act-menu-btn:hover{border-color:var(--c1);color:var(--c1);}
+.act-menu-dropdown{display:none;position:absolute;right:0;top:calc(100% + 4px);z-index:600;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.15);min-width:160px;padding:4px 0;}
+.act-menu-dropdown.open{display:block;}
+.act-menu-item{padding:8px 14px;font-size:12px;cursor:pointer;color:var(--text);white-space:nowrap;display:flex;align-items:center;gap:8px;}
+.act-menu-item:hover{background:var(--bg3);}
+.act-menu-item.danger{color:var(--urgent);}
+.act-menu-item.danger:hover{background:#fde8ee;}
 </style>
   </head><body>
 
@@ -2115,6 +2215,15 @@ function filtrarHistorico(){
       ||(e.estado||'').toLowerCase().includes(busq);
   });
   if(negocio) lista = lista.filter(e=>e.negocio===negocio);
+  // Filtros por columna del histórico
+  HIST_FILTER_COLS.forEach(function(col){
+    if(_histColFilters[col]&&_histColFilters[col].size>0){
+      lista=lista.filter(function(e){
+        var v=col==='consegna'?(e.consegnas||[e.consegna]).filter(Boolean)[0]||'':String(e[col]||'');
+        return _histColFilters[col].has(v);
+      });
+    }
+  });
   if(_histSortCol){
     lista.sort((a,b)=>{
       const va=String(a[_histSortCol]||'').toLowerCase();
@@ -2129,12 +2238,14 @@ function filtrarHistorico(){
 
 function _renderHistRows(hist){
   const tbody = document.getElementById('tbody-historico');
-  if(!hist.length){ tbody.innerHTML='<tr><td colspan="28"><div class="empty-state"><h3>Sin resultados</h3></div></td></tr>'; return; }
+  if(!hist.length){ tbody.innerHTML='<tr><td colspan="32"><div class="empty-state"><h3>Sin resultados</h3></div></td></tr>'; return; }
   const tdS='padding:6px 10px;border-bottom:1px solid var(--bg3);white-space:nowrap;font-size:12px;';
   const tdM='font-family:monospace;font-weight:600;';
+  const artCell=(arts,field)=>(arts&&arts.length)?arts.map(a=>a[field]||'—').join('<br>'):'—';
   tbody.innerHTML=hist.slice().reverse().map((e,i)=>{
     const t=e.transportista||{};
     const bg=i%2===0?'':'background:#fafbfc;';
+    const arts=e.articulos||[];
     return `<tr style="${bg}">
       <td style="${tdS}${tdM}">${(e.consegnas||[e.consegna]).filter(Boolean).join(', ')||'—'}</td>
       <td style="${tdS}${tdM}color:var(--c2)">${e.refcarga||'—'}</td>
@@ -2162,6 +2273,10 @@ function _renderHistRows(hist){
       <td style="${tdS}">${t.empresa||'—'}</td>
       <td style="${tdS}${tdM}">${t.matricula||'—'}</td>
       <td style="${tdS}${tdM}">${t.remolque||'—'}</td>
+      <td style="${tdS};white-space:normal;max-width:160px;font-family:monospace;font-size:11px">${artCell(arts,'orden')}</td>
+      <td style="${tdS};white-space:normal;max-width:180px;font-size:11px">${artCell(arts,'articulo')}</td>
+      <td style="${tdS};text-align:center">${artCell(arts,'linea')}</td>
+      <td style="${tdS};text-align:right;font-weight:600">${artCell(arts,'pz')}</td>
       <td style="${tdS};max-width:200px;white-space:normal">${e.notas||'—'}</td>
       <td style="${tdS}">${new Date(e.finalizadoEn||e.creadoEn).toLocaleDateString('es-ES')}</td>
     </tr>`;
@@ -2173,14 +2288,14 @@ async function renderHistorico(){
   tbody.innerHTML='<tr><td colspan="28" style="text-align:center;padding:1rem;color:var(--text3);">⏳ Cargando…</td></tr>';
   try {
     const hist=await fetchHist();
-    if(!hist.length){tbody.innerHTML='<tr><td colspan="28"><div class="empty-state"><h3>Sin histórico</h3></div></td></tr>';return;}
+    if(!hist.length){tbody.innerHTML='<tr><td colspan="32"><div class="empty-state"><h3>Sin histórico</h3></div></td></tr>';return;}
     _histData = hist;
     // Limpiar filtros
     const hb=document.getElementById('hist-busq'); if(hb) hb.value='';
     const hn=document.getElementById('hist-negocio'); if(hn) hn.value='';
     const hc=document.getElementById('hist-count'); if(hc) hc.textContent=hist.length+' registro'+(hist.length!==1?'s':'');
     _renderHistRows(hist);
-  } catch(e){tbody.innerHTML=`<tr><td colspan="28" style="color:var(--urgent);padding:1rem;">Error: ${e.message}</td></tr>`;}
+  } catch(e){tbody.innerHTML=`<tr><td colspan="32" style="color:var(--urgent);padding:1rem;">Error: ${e.message}</td></tr>`;}
 }
 async function exportarHistorico(){
   const btn=document.querySelector('[onclick="exportarHistorico()"]');
@@ -2196,7 +2311,11 @@ async function exportarHistorico(){
       e.peso,e.contenedor,e.precinto,
       t.conductor,t.dni,t.empresa,t.matricula,t.remolque,
       (e.notas||'').replace(/;/g,','),
-      new Date(e.finalizadoEn||e.creadoEn).toLocaleDateString('es-ES')
+      new Date(e.finalizadoEn||e.creadoEn).toLocaleDateString('es-ES'),
+      (e.articulos||[]).map(a=>a.orden||'').join('|'),
+      (e.articulos||[]).map(a=>a.articulo||'').join('|'),
+      (e.articulos||[]).map(a=>a.linea||'').join('|'),
+      (e.articulos||[]).map(a=>a.pz||'').join('|')
     ].map(v=>v||'').join(';');});
     const blob=new Blob(['\uFEFF'+[headers,...rows].join('\n')],{type:'text/csv;charset=utf-8;'});
     const a=document.createElement('a');
@@ -2781,7 +2900,7 @@ async function confirmarImport(){
 
 
 // ── COLUMN FILTERS ────────────────────────────────────────────────
-const COL_FILTER_COLS = ['consegna','refcarga','cliente','estado','fentrega','fcarga','agencia','asignado','negocio'];
+const COL_FILTER_COLS = ['consegna','refcarga','cliente','estado','fentrega','fcarga','fllegada','tipocamion','agencia','asignado','negocio'];
 let _colFilters = {}; // {col: Set of selected values}
 
 function getColValues(col){
@@ -2856,6 +2975,89 @@ function _updateColFilterBtn(col){
   if(!btn) return;
   btn.classList.toggle('active', !!_colFilters[col]&&_colFilters[col].size>0);
   btn.textContent = (_colFilters[col]&&_colFilters[col].size>0) ? '▾●' : '▾';
+}
+
+
+function toggleActMenu(id, e){
+  e.stopPropagation();
+  closeActMenus();
+  const m=document.getElementById('actmenu-'+id);
+  if(m) m.classList.toggle('open');
+  setTimeout(function(){ document.addEventListener('click', function h(){ closeActMenus(); document.removeEventListener('click',h); }); },0);
+}
+function closeActMenus(){
+  document.querySelectorAll('.act-menu-dropdown.open').forEach(function(m){ m.classList.remove('open'); });
+}
+
+
+// ── HISTORICO COLUMN FILTERS ──────────────────────────────────────
+const HIST_FILTER_COLS = ['consegna','refcarga','cliente','estado','fllegada','fentrega','fcarga','agencia','asignado','negocio','tipocamion','finalizadoEn'];
+let _histColFilters = {};
+
+function getHistColValues(col){
+  const vals=new Set();
+  _histData.forEach(function(e){
+    var v=col==='consegna'?(e.consegnas||[e.consegna]).filter(Boolean)[0]||'':String(e[col]||'');
+    if(v) vals.add(v);
+  });
+  return [...vals].sort();
+}
+
+function toggleHistFilter(col){
+  HIST_FILTER_COLS.forEach(function(c){ if(c!==col){ var d=document.getElementById('hcfd-'+c); if(d) d.classList.remove('open'); } });
+  var dd=document.getElementById('hcfd-'+col);
+  if(!dd) return;
+  if(dd.classList.contains('open')){ dd.classList.remove('open'); return; }
+  var selected=_histColFilters[col]||new Set();
+  var vals=getHistColValues(col);
+  var h='<div class="col-filter-search"><input placeholder="Buscar..." id="hcfs-'+col+'" style="border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;width:100%;outline:none;"/></div>';
+  h+='<div id="hcflist-'+col+'">';
+  h+='<div class="col-filter-item"><input type="checkbox" id="hcfall-'+col+'"'+(selected.size===0?' checked':'')+'/> <label style="cursor:pointer" for="hcfall-'+col+'">(Todos)</label></div>';
+  vals.forEach(function(v){
+    var esc=v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    h+='<div class="col-filter-item" data-val="'+esc+'"><input type="checkbox"'+(selected.has(v)?' checked':'')+'/> <span>'+esc+'</span></div>';
+  });
+  h+='</div><div class="col-filter-actions"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:3px 8px">✕ Limpiar</button></div>';
+  dd.innerHTML=h;
+  dd.classList.add('open');
+  var si=document.getElementById('hcfs-'+col);
+  if(si) si.addEventListener('input',function(){ 
+    var q=this.value.toLowerCase();
+    document.querySelectorAll('#hcflist-'+col+' .col-filter-item[data-val]').forEach(function(item){
+      item.style.display=(item.querySelector('span')?.textContent||'').toLowerCase().includes(q)?'':'none';
+    });
+  });
+  var ac=document.getElementById('hcfall-'+col);
+  if(ac) ac.addEventListener('change',function(){
+    delete _histColFilters[col];
+    _updateHistFilterBtn(col);
+    dd.classList.remove('open');
+    filtrarHistorico();
+  });
+  document.querySelectorAll('#hcflist-'+col+' .col-filter-item[data-val]').forEach(function(item){
+    var cb=item.querySelector('input[type=checkbox]');
+    var v=item.dataset.val;
+    if(cb) cb.addEventListener('change',function(){
+      if(!_histColFilters[col]) _histColFilters[col]=new Set();
+      if(this.checked) _histColFilters[col].add(v); else _histColFilters[col].delete(v);
+      if(_histColFilters[col].size===0) delete _histColFilters[col];
+      _updateHistFilterBtn(col);
+      filtrarHistorico();
+    });
+  });
+  var clrBtn=dd.querySelector('.col-filter-actions button');
+  if(clrBtn) clrBtn.addEventListener('click',function(){
+    delete _histColFilters[col]; _updateHistFilterBtn(col); dd.classList.remove('open'); filtrarHistorico();
+  });
+  setTimeout(function(){ document.addEventListener('click',function hh(ev){ if(!dd.contains(ev.target)){ dd.classList.remove('open'); document.removeEventListener('click',hh); } }); },0);
+}
+
+function _updateHistFilterBtn(col){
+  var btn=document.getElementById('hcfbtn-'+col);
+  if(!btn) return;
+  var active=!!_histColFilters[col]&&_histColFilters[col].size>0;
+  btn.classList.toggle('active',active);
+  btn.textContent=active?'▾●':'▾';
 }
 
 </script>
