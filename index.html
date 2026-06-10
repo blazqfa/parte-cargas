@@ -2565,7 +2565,8 @@ function exportarPDF(){
   const subtitulo=document.getElementById('res-subtitulo').textContent;
   const w=window.open('','_blank','width=960,height=720');
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titulo+'</title>'
-    +'<style>body{font-family:Arial,sans-serif;padding:24px;color:#1A2433}'
+    +'<style>'
+    +'body{font-family:Arial,sans-serif;padding:24px;color:#1A2433}'
     +'.res-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}'
     +'.res-kpi{border:1px solid #ddd;border-radius:6px;padding:12px;text-align:center}'
     +'.res-kpi-v{font-size:22px;font-weight:700;color:#1B3F7A}'
@@ -2574,6 +2575,7 @@ function exportarPDF(){
     +'table{width:100%;border-collapse:collapse;font-size:11px}'
     +'th{background:#1B3F7A;color:#fff;padding:7px 10px;text-align:left;font-size:10px}'
     +'td{padding:6px 10px;border-bottom:1px solid #eee}'
+    +'</style></head><body>'
     +'<h2 style="color:#1B3F7A;margin-bottom:2px">'+titulo+'</h2>'
     +'<p style="color:#6B7A8D;font-size:13px;margin-bottom:16px">'+subtitulo+'</p>'
     +contenido
