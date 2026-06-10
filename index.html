@@ -167,7 +167,7 @@ tbody tr:last-child td{border-bottom:none;}
 .sem-rojo{background:#dc3545;box-shadow:0 0 4px rgba(220,53,69,.6);}
 
 /* SORTABLE HEADERS */
-.th-sort:hover{color:var(--c1);}
+.th-sort:hover{background:rgba(255,255,255,.08);}.th-sort.sort-active{background:rgba(43,200,200,.15);}
 .th-sort .sort-asc::after{content:' ▲';font-size:10px;color:var(--c1);}
 .th-sort .sort-desc::after{content:' ▼';font-size:10px;color:var(--c1);}
 
@@ -258,6 +258,21 @@ tbody tr:last-child td{border-bottom:none;}
 .track-info-val{font-weight:600;color:var(--text);}
 .track-urgente{background:rgba(192,54,90,.07);border:1px solid rgba(192,54,90,.2);border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;color:var(--urgent);}
 @keyframes pulse-blue{0%,100%{box-shadow:0 0 0 0 rgba(46,109,164,.4)}50%{box-shadow:0 0 0 6px rgba(46,109,164,0)}}
+
+/* Column filter dropdowns */
+.col-filter-wrap{position:relative;display:inline-block;}
+.col-filter-btn{background:rgba(0,0,0,.35);border:1px solid rgba(0,0,0,.2);border-radius:4px;cursor:pointer;font-size:11px;color:#fff;padding:1px 5px;margin-left:4px;vertical-align:middle;line-height:1.4;display:inline-block;}
+.col-filter-btn:hover{background:rgba(0,0,0,.55);}
+.col-filter-btn.active{background:#2BC8C8;color:#1B3F7A;font-weight:700;border-color:#2BC8C8;}
+.col-filter-dropdown{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:600;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.2);min-width:200px;padding:6px 0;max-height:280px;overflow-y:auto;}
+.col-filter-dropdown.open{display:block;}
+.col-filter-item{padding:7px 14px;font-size:12px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;}
+.col-filter-item:hover{background:var(--bg3);}
+.col-filter-item.selected{background:var(--c5);color:var(--c1);font-weight:600;}
+.col-filter-item input[type=checkbox]{accent-color:var(--c1);width:14px;height:14px;cursor:pointer;flex-shrink:0;}
+.col-filter-search{padding:6px 10px;border-bottom:1px solid var(--border);display:flex;gap:4px;}
+.col-filter-search input{border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;width:100%;outline:none;font-family:var(--font);}
+.col-filter-actions{padding:6px 10px;border-top:1px solid var(--border);display:flex;gap:6px;justify-content:flex-end;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
 
@@ -484,6 +499,85 @@ async function confirmarImport(){
   alert(msg);
 }
 
+
+// ── COLUMN FILTERS ────────────────────────────────────────────────
+const COL_FILTER_COLS = ['consegna','refcarga','cliente','estado','fentrega','fcarga','agencia','asignado','negocio'];
+let _colFilters = {}; // {col: Set of selected values}
+
+function getColValues(col){
+  const vals = new Set();
+  _enviosCache.forEach(e=>{
+    const v = col==='consegna'
+      ? (e.consegnas||[e.consegna]).filter(Boolean)[0]||''
+      : String(e[col]||'');
+    if(v) vals.add(v);
+  });
+  return [...vals].sort();
+}
+
+function toggleColFilter(col){
+  COL_FILTER_COLS.forEach(function(c){ if(c!==col){ var d=document.getElementById('cfd-'+c); if(d) d.classList.remove('open'); } });
+  var dd=document.getElementById('cfd-'+col);
+  if(!dd) return;
+  if(dd.classList.contains('open')){ dd.classList.remove('open'); return; }
+  var selected=_colFilters[col]||new Set();
+  var vals=getColValues(col);
+  var html='<div class="col-filter-search"><input placeholder="Buscar..." id="cfs-'+col+'" style="border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;width:100%;outline:none;"/></div>';
+  html+='<div id="cflist-'+col+'">';
+  html+='<div class="col-filter-item" id="cfitemall-'+col+'"><input type="checkbox" id="cfall-'+col+'"'+(selected.size===0?' checked':'')+'/> <label style="cursor:pointer" for="cfall-'+col+'">(Todos)</label></div>';
+  vals.forEach(function(v){
+    var esc=v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    html+='<div class="col-filter-item" data-val="'+esc+'"><input type="checkbox"'+(selected.has(v)?' checked':'')+'/> <span>'+esc+'</span></div>';
+  });
+  html+='</div>';
+  html+='<div class="col-filter-actions"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:3px 8px">✕ Limpiar</button></div>';
+  dd.innerHTML=html;
+  dd.classList.add('open');
+  // Attach events after innerHTML set
+  var searchInp=document.getElementById('cfs-'+col);
+  if(searchInp) searchInp.addEventListener('input',function(){ filterColSearch(this,col); });
+  var allCb=document.getElementById('cfall-'+col);
+  if(allCb) allCb.addEventListener('change',function(){ colFilterAll(col); });
+  document.querySelectorAll('#cflist-'+col+' .col-filter-item[data-val]').forEach(function(item){
+    var cb=item.querySelector('input[type=checkbox]');
+    var v=item.dataset.val;
+    if(cb) cb.addEventListener('change',function(){ colFilterToggle(col,v,this.checked); });
+  });
+  document.querySelector('#cfd-'+col+' .col-filter-actions button').addEventListener('click',function(){ colFilterClear(col); });
+  setTimeout(function(){ document.addEventListener('click',function h(e){ if(!dd.contains(e.target)){ dd.classList.remove('open'); document.removeEventListener('click',h); } }); },0);
+}
+
+function colFilterToggle(col, val, checked){
+  if(!_colFilters[col]) _colFilters[col]=new Set();
+  if(checked) _colFilters[col].add(val); else _colFilters[col].delete(val);
+  if(_colFilters[col].size===0) delete _colFilters[col];
+  _updateColFilterBtn(col);
+  renderTabla();
+}
+
+function colFilterAll(col){
+  delete _colFilters[col];
+  _updateColFilterBtn(col);
+  const dd = document.getElementById('cfd-'+col);
+  if(dd){ dd.querySelectorAll('input[type=checkbox]').forEach((cb,i)=>{ cb.checked=i===0; }); }
+  renderTabla();
+}
+
+function colFilterClear(col){
+  delete _colFilters[col];
+  _updateColFilterBtn(col);
+  const dd = document.getElementById('cfd-'+col);
+  if(dd) dd.classList.remove('open');
+  renderTabla();
+}
+
+function _updateColFilterBtn(col){
+  const btn = document.getElementById('cfbtn-'+col);
+  if(!btn) return;
+  btn.classList.toggle('active', !!_colFilters[col]&&_colFilters[col].size>0);
+  btn.textContent = (_colFilters[col]&&_colFilters[col].size>0) ? '▾●' : '▾';
+}
+
 </script>
 </head>
 <body>
@@ -500,17 +594,6 @@ async function confirmarImport(){
     <div class="form-group">
       <label class="form-label">Contraseña</label>
       <input class="form-input" type="password" id="li-pass" placeholder="••••••••"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Rol</label>
-      <select class="form-select" id="li-rol">
-        <option value="">— Selecciona rol —</option>
-        <option value="ADMINISTRADOR">ADMINISTRADOR</option>
-        <option value="VENTANILLA">VENTANILLA</option>
-        <option value="EXPEDICIONES">EXPEDICIONES</option>
-        <option value="CUSTOMER_SERVICE">CUSTOMER SERVICE</option>
-        <option value="INVITADO">INVITADO</option>
-      </select>
     </div>
     <button class="btn-primary" style="width:100%;margin-top:.5rem;" id="btn-login" onclick="doLogin()">Acceder</button>
     <div class="login-error" id="li-error">Usuario, contraseña o rol incorrectos</div>
@@ -621,19 +704,15 @@ async function confirmarImport(){
         <thead>
           <tr>
             <th></th>
-            <th>Consegna</th>
-            <th>OT (Ref. Carga)</th>
-            <th>Cliente</th>
-            <th class="th-sort" onclick="setSort('estado')" style="cursor:pointer;user-select:none;" id="th-estado">
-              Estado <span id="sort-icon-estado"></span>
-            </th>
-            <th class="th-sort" onclick="setSort('fentrega')" style="cursor:pointer;user-select:none;" id="th-fentrega">
-              F. Entrega <span id="sort-icon-fentrega"></span>
-            </th>
-            <th>F. Carga</th>
-            <th>Agencia</th>
-            <th>Asignado</th>
-            <th>Tipo negocio</th>
+            <th onclick="setSort('consegna')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-consegna">Consegna <span id="sort-icon-consegna"></span><span class="col-filter-btn" id="cfbtn-consegna" onclick="event.stopPropagation();toggleColFilter('consegna')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-consegna"></div></th>
+            <th onclick="setSort('refcarga')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-refcarga">OT <span id="sort-icon-refcarga"></span><span class="col-filter-btn" id="cfbtn-refcarga" onclick="event.stopPropagation();toggleColFilter('refcarga')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-refcarga"></div></th>
+            <th onclick="setSort('cliente')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-cliente">Cliente <span id="sort-icon-cliente"></span><span class="col-filter-btn" id="cfbtn-cliente" onclick="event.stopPropagation();toggleColFilter('cliente')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-cliente"></div></th>
+            <th onclick="setSort('estado')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-estado">Estado <span id="sort-icon-estado"></span><span class="col-filter-btn" id="cfbtn-estado" onclick="event.stopPropagation();toggleColFilter('estado')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-estado"></div></th>
+            <th onclick="setSort('fentrega')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-fentrega">F. Entrega <span id="sort-icon-fentrega"></span><span class="col-filter-btn" id="cfbtn-fentrega" onclick="event.stopPropagation();toggleColFilter('fentrega')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-fentrega"></div></th>
+            <th onclick="setSort('fcarga')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-fcarga">F. Carga <span id="sort-icon-fcarga"></span><span class="col-filter-btn" id="cfbtn-fcarga" onclick="event.stopPropagation();toggleColFilter('fcarga')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-fcarga"></div></th>
+            <th onclick="setSort('agencia')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-agencia">Agencia <span id="sort-icon-agencia"></span><span class="col-filter-btn" id="cfbtn-agencia" onclick="event.stopPropagation();toggleColFilter('agencia')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-agencia"></div></th>
+            <th onclick="setSort('asignado')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-asignado">Asignado <span id="sort-icon-asignado"></span><span class="col-filter-btn" id="cfbtn-asignado" onclick="event.stopPropagation();toggleColFilter('asignado')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-asignado"></div></th>
+            <th onclick="setSort('negocio')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-negocio">Negocio <span id="sort-icon-negocio"></span><span class="col-filter-btn" id="cfbtn-negocio" onclick="event.stopPropagation();toggleColFilter('negocio')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-negocio"></div></th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -889,18 +968,28 @@ async function confirmarImport(){
       </div>
     </div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:8px;" id="hist-count"></div>
-    <div class="table-wrapper" style="overflow-x:auto;">
+    <div class="table-wrapper" style="overflow-x:scroll;overflow-y:auto;max-height:70vh;">
       <table id="tabla-historico" style="min-width:1400px;">
-        <thead><tr>
-          <th>Consegna</th><th>OT (Ref.Carga)</th><th>Cliente</th>
-          <th>Estado</th><th>F.Llegada</th><th>F.Entrega</th><th>F.Carga</th><th>F.Trans.</th>
-          <th>Agencia</th><th>Asignado</th><th>Negocio</th><th>Tipo camión</th>
-          <th>Pallets</th><th>Destino</th><th>Lugar carga</th>
-          <th>H.Carga</th><th>H.Llegada</th><th>H.Salida</th>
-          <th>Peso</th><th>Contenedor</th><th>Precinto</th>
-          <th>Conductor</th><th>DNI</th><th>Empresa trans.</th><th>Matrícula</th><th>Remolque</th>
-          <th>Notas</th><th>F. Finalizado</th>
-        </tr></thead>
+        <thead>
+          <tr>
+            <th class="th-sort" onclick="sortHist('consegna')">Consegna <span id="hsi-consegna"></span></th>
+            <th class="th-sort" onclick="sortHist('refcarga')">OT (Ref.Carga) <span id="hsi-refcarga"></span></th>
+            <th class="th-sort" onclick="sortHist('cliente')">Cliente <span id="hsi-cliente"></span></th>
+            <th class="th-sort" onclick="sortHist('estado')">Estado <span id="hsi-estado"></span></th>
+            <th class="th-sort" onclick="sortHist('fllegada')">F.Llegada <span id="hsi-fllegada"></span></th>
+            <th class="th-sort" onclick="sortHist('fentrega')">F.Entrega <span id="hsi-fentrega"></span></th>
+            <th class="th-sort" onclick="sortHist('fcarga')">F.Carga <span id="hsi-fcarga"></span></th>
+            <th>F.Trans.</th>
+            <th class="th-sort" onclick="sortHist('agencia')">Agencia <span id="hsi-agencia"></span></th>
+            <th class="th-sort" onclick="sortHist('asignado')">Asignado <span id="hsi-asignado"></span></th>
+            <th class="th-sort" onclick="sortHist('negocio')">Negocio <span id="hsi-negocio"></span></th>
+            <th>Tipo camión</th><th>Pallets</th><th>Destino</th><th>Lugar carga</th>
+            <th>H.Carga</th><th>H.Llegada</th><th>H.Salida</th>
+            <th>Peso</th><th>Contenedor</th><th>Precinto</th>
+            <th>Conductor</th><th>DNI</th><th>Empresa trans.</th><th>Matrícula</th><th>Remolque</th>
+            <th>Notas</th><th class="th-sort" onclick="sortHist('finalizadoEn')">F. Finalizado <span id="hsi-finalizadoEn"></span></th>
+          </tr>
+        </thead>
         <tbody id="tbody-historico"></tbody>
       </table>
     </div>
@@ -1226,7 +1315,7 @@ async function doLogin() {
   if (!GS_URL) { showConfigModal(); return; }
   const usr=document.getElementById('li-user').value.trim();
   const pass=document.getElementById('li-pass').value;
-  const rol=document.getElementById('li-rol').value;
+
   // Cargar usuarios desde Sheets para tener permisos actualizados
   let users = getUsers();
   try {
@@ -1237,8 +1326,8 @@ async function doLogin() {
       users = ru.data;
     }
   } catch(e) { /* usar fallback local */ }
-  const found=users.find(u=>u.user.toLowerCase()===usr.toLowerCase()&&u.pass===pass&&u.rol===rol);
-  if(!found||!rol){document.getElementById('li-error').style.display='block';return;}
+  const found=users.find(u=>u.user.toLowerCase()===usr.toLowerCase()&&u.pass===pass);
+  if(!found){document.getElementById('li-error').style.display='block';return;}
   document.getElementById('li-error').style.display='none';
   const btn=document.getElementById('btn-login');
   btn.disabled=true; btn.textContent='Conectando…';
@@ -1265,16 +1354,15 @@ async function doLogin() {
   document.getElementById('app').style.display='block';
   document.getElementById('nav-username').textContent=found.user;
   document.getElementById('nav-role').textContent=found.rol;
-  document.getElementById('tab-admin').style.display=rol==='ADMINISTRADOR'?'':'none';
-  document.getElementById('tab-nuevo').style.display=(rol==='CUSTOMER_SERVICE'||rol==='INVITADO'||(found.permisos&&found.permisos.nuevo===false))?'none':'';
+  document.getElementById('tab-admin').style.display=found.rol==='ADMINISTRADOR'?'':'none';
+  document.getElementById('tab-nuevo').style.display=(found.rol==='CUSTOMER_SERVICE'||found.rol==='INVITADO'||(found.permisos&&found.permisos.nuevo===false))?'none':'';
   document.getElementById('tab-tracking').style.display='';
   const tabSap=document.querySelector('[data-page="sap"]');
-  if(tabSap) tabSap.style.display=(rol==='INVITADO')?'none':'';
-  // CS: ir directo a tracking
-  if(rol==='CUSTOMER_SERVICE'){
+  if(tabSap) tabSap.style.display=(found.rol==='INVITADO')?'none':'';
+  if(found.rol==='CUSTOMER_SERVICE'){
     goPage('tracking',document.getElementById('tab-tracking'));
   }
-  if(rol==='ADMINISTRADOR') document.getElementById('hist-admin-tools').style.display='flex';
+  if(found.rol==='ADMINISTRADOR') document.getElementById('hist-admin-tools').style.display='flex';
   addField('consegnas-form-container','consegna-form');
   addArticulo();
   _lastHash=_enviosCache.map(e=>e.id+'|'+e.estado).join(',');
@@ -1408,7 +1496,7 @@ let sortCol=null, sortDir=1;
 
 function setSort(col){
   sortDir=sortCol===col?-sortDir:1; sortCol=col;
-  ['estado','fentrega'].forEach(c=>{
+  ['consegna','refcarga','cliente','estado','fentrega','fcarga','agencia','asignado','negocio'].forEach(c=>{
     const el=document.getElementById('sort-icon-'+c); if(!el) return;
     el.className=''; if(c===sortCol) el.className=sortDir===1?'sort-asc':'sort-desc';
   });
@@ -1436,13 +1524,25 @@ function renderTabla(){
   const filtEst=document.getElementById('filtro-estado')?.value||'';
   const filtAs=document.getElementById('filtro-asignado')?.value||'';
   const busq=document.getElementById('busqueda')?.value.toLowerCase()||'';
+  // Apply column filters
+  COL_FILTER_COLS.forEach(col=>{
+    if(_colFilters[col]&&_colFilters[col].size>0){
+      envios=envios.filter(e=>{
+        const v=col==='consegna'
+          ?(e.consegnas||[e.consegna]).filter(Boolean)[0]||''
+          :String(e[col]||'');
+        return _colFilters[col].has(v);
+      });
+    }
+  });
   if(filtEst) envios=envios.filter(e=>e.estado===filtEst);
   if(filtAs)  envios=envios.filter(e=>e.asignado===filtAs);
   if(busq)    envios=envios.filter(e=>(e.consegna||'').toLowerCase().includes(busq)||(e.cliente||'').toLowerCase().includes(busq)||(e.agencia||'').toLowerCase().includes(busq)||(e.refcarga||'').toLowerCase().includes(busq)||((e.consegnas||[]).join(' ')).toLowerCase().includes(busq)||(e.articulos||[]).some(a=>(a.orden||'').toLowerCase().includes(busq)||(a.articulo||'').toLowerCase().includes(busq)));
   if(sortCol) envios=[...envios].sort((a,b)=>{
     if(sortCol==='estado'){const oa=ESTADO_ORD[a.estado]??99,ob=ESTADO_ORD[b.estado]??99;return(oa-ob)*sortDir;}
-    if(sortCol==='fentrega'){const da=a.fentrega||'9999',db=b.fentrega||'9999';return da<db?-sortDir:da>db?sortDir:0;}
-    return 0;
+    if(sortCol==='fentrega'||sortCol==='fcarga'){const da=a[sortCol]||'9999',db=b[sortCol]||'9999';return da<db?-sortDir:da>db?sortDir:0;}
+    const va=String(a[sortCol]||'').toLowerCase(), vb=String(b[sortCol]||'').toLowerCase();
+    return sortDir*va.localeCompare(vb);
   });
   const canEdit=currentPermisos.editar||currentRol==='ADMINISTRADOR'||currentRol==='VENTANILLA';
   const canDelete=currentPermisos.eliminar||currentRol==='ADMINISTRADOR'||currentRol==='VENTANILLA';
@@ -1458,7 +1558,7 @@ function renderTabla(){
     </select>`;
     const mainRow=`<tr data-id="${e.id}">
       <td><button class="btn btn-xs" onclick="toggleExpand('${e.id}')">${isOpen?'▲':'▼'}</button></td>
-      <td style="font-family:'IBM Plex Mono',monospace;font-weight:600;">${(e.consegnas||[e.consegna]).filter(Boolean).join(' / ')||'—'}${transIcon}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-weight:600;white-space:nowrap;">${(()=>{const cs=(e.consegnas||[e.consegna]).filter(Boolean);if(!cs.length)return '—'+transIcon;const badge=cs.length>1?'<span style=\"background:var(--c5);color:var(--c1);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px;\" title=\"'+cs.join(', ')+'\"">+' +(cs.length-1)+'</span>':'';return cs[0]+badge+transIcon;})()}</td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--c1);font-weight:600;">${e.refcarga||'—'}</td>
       <td>${e.cliente||'—'}</td>
       <td>${estadoCell}</td>
@@ -1708,7 +1808,9 @@ function imprimirFichaConductor(){
       body{padding:12px 16px}
       @page{size:A4;margin:15mm}
     }
-  </style>
+  
+/* Column filter dropdowns */
+</style>
   </head><body>
 
   <div class="logo-area">
@@ -1984,6 +2086,17 @@ function procesarSAP(){
 // ── HISTÓRICO ─────────────────────────────────────────────────────
 let _histData = [];
 
+let _histSortCol='', _histSortDir=1;
+function sortHist(col){
+  if(_histSortCol===col) _histSortDir*=-1; else {_histSortCol=col;_histSortDir=1;}
+  // Reset icons
+  document.querySelectorAll('[id^="hsi-"]').forEach(el=>el.className='');
+  const el=document.getElementById('hsi-'+col);
+  if(el) el.className=_histSortDir===1?'sort-asc':'sort-desc';
+  filtrarHistorico();
+}
+
+
 function filtrarHistorico(){
   const busq = (document.getElementById('hist-busq')?.value||'').toLowerCase();
   const negocio = document.getElementById('hist-negocio')?.value||'';
@@ -2002,6 +2115,13 @@ function filtrarHistorico(){
       ||(e.estado||'').toLowerCase().includes(busq);
   });
   if(negocio) lista = lista.filter(e=>e.negocio===negocio);
+  if(_histSortCol){
+    lista.sort((a,b)=>{
+      const va=String(a[_histSortCol]||'').toLowerCase();
+      const vb=String(b[_histSortCol]||'').toLowerCase();
+      return _histSortDir*va.localeCompare(vb);
+    });
+  }
   const count = document.getElementById('hist-count');
   if(count) count.textContent = lista.length + ' registro' + (lista.length!==1?'s':'') + (busq||negocio?' (filtrado)':'');
   _renderHistRows(lista);
@@ -2326,7 +2446,6 @@ function exportarPDF(){
     +'table{width:100%;border-collapse:collapse;font-size:11px}'
     +'th{background:#1B3F7A;color:#fff;padding:7px 10px;text-align:left;font-size:10px}'
     +'td{padding:6px 10px;border-bottom:1px solid #eee}'
-    +'</style></head><body>'
     +'<h2 style="color:#1B3F7A;margin-bottom:2px">'+titulo+'</h2>'
     +'<p style="color:#6B7A8D;font-size:13px;margin-bottom:16px">'+subtitulo+'</p>'
     +contenido
@@ -2658,6 +2777,85 @@ async function confirmarImport(){
   const msg=`✅ ${ok} expedición${ok!==1?'es':''} importada${ok!==1?'s':''}${fail?` · ❌ ${fail} error${fail!==1?'es':''}`:''}.`;
   _showSyncToast(msg,'#1a7a3d');
   alert(msg);
+}
+
+
+// ── COLUMN FILTERS ────────────────────────────────────────────────
+const COL_FILTER_COLS = ['consegna','refcarga','cliente','estado','fentrega','fcarga','agencia','asignado','negocio'];
+let _colFilters = {}; // {col: Set of selected values}
+
+function getColValues(col){
+  const vals = new Set();
+  _enviosCache.forEach(e=>{
+    const v = col==='consegna'
+      ? (e.consegnas||[e.consegna]).filter(Boolean)[0]||''
+      : String(e[col]||'');
+    if(v) vals.add(v);
+  });
+  return [...vals].sort();
+}
+
+function toggleColFilter(col){
+  COL_FILTER_COLS.forEach(function(c){ if(c!==col){ var d=document.getElementById('cfd-'+c); if(d) d.classList.remove('open'); } });
+  var dd=document.getElementById('cfd-'+col);
+  if(!dd) return;
+  if(dd.classList.contains('open')){ dd.classList.remove('open'); return; }
+  var selected=_colFilters[col]||new Set();
+  var vals=getColValues(col);
+  var h='<div class="col-filter-search"><input placeholder="Buscar..." id="cfs-'+col+'" style="border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;width:100%;outline:none;"/></div>';
+  h+='<div id="cflist-'+col+'">';
+  h+='<div class="col-filter-item" id="cfitemall-'+col+'"><input type="checkbox" id="cfall-'+col+'"'+(selected.size===0?' checked':'')+'/> <label style="cursor:pointer" for="cfall-'+col+'">(Todos)</label></div>';
+  vals.forEach(function(v){
+    var esc=v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    h+='<div class="col-filter-item" data-val="'+esc+'"><input type="checkbox"'+(selected.has(v)?' checked':'')+'/> <span>'+esc+'</span></div>';
+  });
+  h+='</div><div class="col-filter-actions"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:3px 8px">✕ Limpiar</button></div>';
+  dd.innerHTML=h;
+  dd.classList.add('open');
+  var si=document.getElementById('cfs-'+col);
+  if(si) si.addEventListener('input',function(){ filterColSearch(this,col); });
+  var ac=document.getElementById('cfall-'+col);
+  if(ac) ac.addEventListener('change',function(){ colFilterAll(col); });
+  document.querySelectorAll('#cflist-'+col+' .col-filter-item[data-val]').forEach(function(item){
+    var cb=item.querySelector('input[type=checkbox]');
+    var v=item.dataset.val;
+    if(cb) cb.addEventListener('change',function(){ colFilterToggle2(col,v,this.checked); });
+  });
+  var clrBtn=dd.querySelector('.col-filter-actions button');
+  if(clrBtn) clrBtn.addEventListener('click',function(){ colFilterClear(col); });
+  setTimeout(function(){ document.addEventListener('click',function h2(e){ if(!dd.contains(e.target)){ dd.classList.remove('open'); document.removeEventListener('click',h2); } }); },0);
+}
+function colFilterToggle2(col,val,checked){ if(!_colFilters[col]) _colFilters[col]=new Set(); if(checked) _colFilters[col].add(val); else _colFilters[col].delete(val); if(_colFilters[col].size===0) delete _colFilters[col]; _updateColFilterBtn(col); renderTabla(); }
+
+function colFilterToggle(col, val, checked){
+  if(!_colFilters[col]) _colFilters[col]=new Set();
+  if(checked) _colFilters[col].add(val); else _colFilters[col].delete(val);
+  if(_colFilters[col].size===0) delete _colFilters[col];
+  _updateColFilterBtn(col);
+  renderTabla();
+}
+
+function colFilterAll(col){
+  delete _colFilters[col];
+  _updateColFilterBtn(col);
+  const dd = document.getElementById('cfd-'+col);
+  if(dd){ dd.querySelectorAll('input[type=checkbox]').forEach((cb,i)=>{ cb.checked=i===0; }); }
+  renderTabla();
+}
+
+function colFilterClear(col){
+  delete _colFilters[col];
+  _updateColFilterBtn(col);
+  const dd = document.getElementById('cfd-'+col);
+  if(dd) dd.classList.remove('open');
+  renderTabla();
+}
+
+function _updateColFilterBtn(col){
+  const btn = document.getElementById('cfbtn-'+col);
+  if(!btn) return;
+  btn.classList.toggle('active', !!_colFilters[col]&&_colFilters[col].size>0);
+  btn.textContent = (_colFilters[col]&&_colFilters[col].size>0) ? '▾●' : '▾';
 }
 
 </script>
