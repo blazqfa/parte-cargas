@@ -2463,6 +2463,9 @@ function updateKPIs(){
   const hs=_isoDate(hoy), ms=_isoDate(man);
   const deHoy   =env.filter(e=>e.fcarga===hs);
   const deMan   =env.filter(e=>e.fcarga===ms);
+  // DEBUG: mostrar qué fechas de carga hay en el caché
+  const fechasCarga=[...new Set(env.map(e=>e.fcarga).filter(Boolean))].sort();
+  console.log('KPI DEBUG — hoy:',hs,'mañana:',ms,'fechas fcarga en caché:',fechasCarga);
   const inc     =env.filter(e=>e.estado==='INCIDENCIA');
   document.getElementById('kpi-hoy').textContent    =deHoy.length;
   document.getElementById('kpi-hoy-sub').textContent=deHoy.length===1?'expedicion':'expediciones';
