@@ -2447,7 +2447,13 @@ function _sigDiaLab(d){
   while(r.getDay()===0||r.getDay()===6) r.setDate(r.getDate()+1);
   return r;
 }
-function _isoDate(d){ return d.toISOString().slice(0,10); }
+function _isoDate(d){
+  // Usar fecha local, no UTC (evita desfase horario)
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const dd=String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+dd;
+}
 function _fmtFecha(d){ return d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}); }
 
 function updateKPIs(){
