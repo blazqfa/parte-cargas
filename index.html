@@ -786,9 +786,9 @@ function _updateHistFilterBtn(col){
             <th onclick="setSort('refcarga')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-refcarga">OT <span id="sort-icon-refcarga"></span><span class="col-filter-btn" id="cfbtn-refcarga" onclick="event.stopPropagation();toggleColFilter('refcarga')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-refcarga"></div></th>
             <th onclick="setSort('cliente')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-cliente">Cliente <span id="sort-icon-cliente"></span><span class="col-filter-btn" id="cfbtn-cliente" onclick="event.stopPropagation();toggleColFilter('cliente')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-cliente"></div></th>
             <th onclick="setSort('estado')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-estado">Estado <span id="sort-icon-estado"></span><span class="col-filter-btn" id="cfbtn-estado" onclick="event.stopPropagation();toggleColFilter('estado')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-estado"></div></th>
-            <th onclick="setSort('fentrega')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-fentrega">F. Entrega <span id="sort-icon-fentrega"></span><span class="col-filter-btn" id="cfbtn-fentrega" onclick="event.stopPropagation();toggleColFilter('fentrega')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-fentrega"></div></th>
+            <th onclick="setSort('fllegada')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-fllegada">F. Pedido <span id="sort-icon-fllegada"></span><span class="col-filter-btn" id="cfbtn-fllegada" onclick="event.stopPropagation();toggleColFilter('fllegada')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-fllegada"></div></th>
             <th onclick="setSort('fcarga')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-fcarga">F. Carga <span id="sort-icon-fcarga"></span><span class="col-filter-btn" id="cfbtn-fcarga" onclick="event.stopPropagation();toggleColFilter('fcarga')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-fcarga"></div></th>
-            <th onclick="setSort('fllegada')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-fllegada">F. Llegada <span id="sort-icon-fllegada"></span><span class="col-filter-btn" id="cfbtn-fllegada" onclick="event.stopPropagation();toggleColFilter('fllegada')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-fllegada"></div></th>
+            <th onclick="setSort('fentrega')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-fentrega">F. Entrega <span id="sort-icon-fentrega"></span><span class="col-filter-btn" id="cfbtn-fentrega" onclick="event.stopPropagation();toggleColFilter('fentrega')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-fentrega"></div></th>
             <th onclick="setSort('tipocamion')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-tipocamion">Tipo Camión <span id="sort-icon-tipocamion"></span><span class="col-filter-btn" id="cfbtn-tipocamion" onclick="event.stopPropagation();toggleColFilter('tipocamion')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-tipocamion"></div></th>
             <th onclick="setSort('agencia')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-agencia">Agencia <span id="sort-icon-agencia"></span><span class="col-filter-btn" id="cfbtn-agencia" onclick="event.stopPropagation();toggleColFilter('agencia')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-agencia"></div></th>
             <th onclick="setSort('asignado')" style="cursor:pointer;user-select:none;position:relative;" class="th-sort" id="th-asignado">Asignado <span id="sort-icon-asignado"></span><span class="col-filter-btn" id="cfbtn-asignado" onclick="event.stopPropagation();toggleColFilter('asignado')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="cfd-asignado"></div></th>
@@ -1643,9 +1643,9 @@ function renderTabla(){
       <td style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--c1);font-weight:600;">${e.refcarga||'—'}</td>
       <td>${e.cliente||'—'}</td>
       <td>${estadoCell}</td>
-      <td><span class="semaforo">${sem}<span>${e.fentrega||'—'}</span></span></td>
-      <td>${e.fcarga||'—'}</td>
-      <td>${e.fllegada||'—'}</td>
+      <td>${e.fllegada?_fmtDate(e.fllegada):'—'}</td>
+      <td>${e.fcarga?_fmtDate(e.fcarga):'—'}</td>
+      <td><span class="semaforo">${sem}<span>${e.fentrega?_fmtDate(e.fentrega):'—'}</span></span></td>
       <td>${e.tipocamion||'—'}</td>
       <td>${e.agencia||'—'}</td>
       <td>${e.asignado||'—'}</td>
@@ -2442,6 +2442,13 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 
 // ── KPI + INFORME DIARIO ──────────────────────────────────────────
+function _fmtDate(s){
+  if(!s) return '—';
+  // Acepta YYYY-MM-DD y convierte a DD/MM/AAAA
+  const p=String(s).trim().split('-');
+  if(p.length===3) return p[2]+'/'+p[1]+'/'+p[0];
+  return s;
+}
 function _sigDiaLab(d){
   const r=new Date(d); r.setDate(r.getDate()+1);
   while(r.getDay()===0||r.getDay()===6) r.setDate(r.getDate()+1);
