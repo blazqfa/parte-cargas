@@ -671,6 +671,94 @@ function _updateHistFilterBtn(col){
   btn.textContent=active?'▾●':'▾';
 }
 
+
+function abrirPresupuesto(id){
+  const e = _enviosCache.find(x=>x.id===id)||{};
+  const cs = (e.consegnas||[e.consegna]).filter(Boolean).join(', ')||'';
+  // Pre-rellenar modal
+  document.getElementById('pres-ot').value        = e.refcarga||'';
+  document.getElementById('pres-negocio').value   = e.negocio||'';
+  document.getElementById('pres-articulo').value  = (e.articulos&&e.articulos[0])?e.articulos[0].articulo||'':'';
+  document.getElementById('pres-lugarcarga').value= e.lugarcarga||'';
+  document.getElementById('pres-destino').value   = e.destino||'';
+  document.getElementById('pres-dirección').value = '';
+  document.getElementById('pres-cliente').value   = e.cliente||'';
+  document.getElementById('pres-fentrega').value  = e.fentrega||'';
+  document.getElementById('pres-fcarga').value    = e.fcarga||'';
+  document.getElementById('pres-tipocamion').value= e.tipocamion||'';
+  document.getElementById('pres-pallets').value   = e.pallets||'';
+  document.getElementById('pres-tipopallets').value='';
+  document.getElementById('pres-remontable').value='';
+  document.getElementById('pres-peso').value      = e.peso||'';
+  document.getElementById('pres-agencia').value   = e.agencia||'';
+  document.getElementById('pres-notas').value     = e.notas||'';
+  document.getElementById('modal-presupuesto').classList.add('open');
+}
+
+function enviarPresupuesto(){
+  const g = id => document.getElementById(id)?.value||'';
+  const ot       = g('pres-ot');
+  const negocio  = g('pres-negocio');
+  const articulo = g('pres-articulo');
+  const lc       = g('pres-lugarcarga');
+  const destino  = g('pres-destino');
+  const dir      = g('pres-dirección');
+  const cliente  = g('pres-cliente');
+  const fent     = g('pres-fentrega');
+  const fcarga   = g('pres-fcarga');
+  const tcamion  = g('pres-tipocamion');
+  const pallets  = g('pres-pallets');
+  const tpal     = g('pres-tipopallets');
+  const remon    = g('pres-remontable');
+  const peso     = g('pres-peso');
+  const agencia  = g('pres-agencia');
+  const notas    = g('pres-notas');
+
+  const cuerpo = `Estimados,
+
+Necesitamos presupuesto para el siguiente transporte:
+
+REFERENCIA (OT): ${ot}
+
+INFORMACIÓN DE ENTREGA:
+- Negocio: ${negocio}
+- Artículo: ${articulo}
+- Lugar de carga: ${lc}
+- Destino: ${destino}
+- Dirección de entrega: ${dir}
+- Cliente: ${cliente}
+- Fecha de entrega: ${fent}
+*Con cargo a Bormioli Luigi
+
+INFORMACIÓN DE LA CARGA:
+- Fecha de carga: ${fcarga}
+- Tipo de camión: ${tcamion}
+- Nº pallets: ${pallets}
+- Tipo de pallets: ${tpal}
+- ¿Es remontable?: ${remon}
+- Peso: ${peso}
+*El camión tiene que venir provisto de 2 barras y 2 Eslingas (Cinchas) para sujetar la mercancía.
+
+INFORMACIÓN DE AGENCIA DE TRANSPORTE (a rellenar por la agencia):
+- Agencia de transporte: ${agencia}
+- F. de entrega confirmada por transporte:
+- Matrícula de camión:
+*Necesitamos confirmación de la fecha, hora y contacto del RDV con el que realizaron la reserva.
+
+NOTAS: ${notas}
+
+Quedamos a su disposición para cualquier consulta.
+
+Un saludo,
+Bormioli Luigi — Gestión de Expediciones`;
+
+  const mailtoLink = 'mailto:?subject=Presupuesto%20Transporte%20-%20OT%20' 
+    + encodeURIComponent(ot) 
+    + '&body=' + encodeURIComponent(cuerpo);
+  window.open(mailtoLink);
+  closeModal('modal-presupuesto');
+}
+
 </script>
 </head>
 <body>
@@ -1032,7 +1120,7 @@ function _updateHistFilterBtn(col){
   <!-- HISTÓRICO -->
   <div class="page" id="page-historico">
     <div class="section-header">
-      <div class="section-title">Histórico de expediciones (CARGADO)</div>
+      <div class="section-title">Histórico de expediciones</div>
       <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
         <input class="search-input" id="hist-busq" placeholder="Buscar consegna, OT, cliente, agencia…" oninput="filtrarHistorico()" style="width:280px;"/>
         <select class="form-select" id="hist-negocio" onchange="filtrarHistorico()" style="padding:6px 10px;font-size:12px;">
@@ -1041,7 +1129,7 @@ function _updateHistFilterBtn(col){
           <option>CASALINGO</option>
           <option>STOCK MASTER</option>
         </select>
-        <div id="hist-admin-tools" style="display:none;gap:.5rem;display:flex;">
+        <div id="hist-admin-tools" style="display:none;gap:.5rem;">
           <button class="btn btn-sm" onclick="exportarHistorico()">⬇ Exportar CSV</button>
           <button class="btn btn-sm btn-danger" onclick="limpiarHistorico()">🗑 Limpiar</button>
         </div>
@@ -1174,6 +1262,45 @@ function _updateHistFilterBtn(col){
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-trans-manual')">Cancelar</button>
       <button class="btn btn-primary" onclick="guardarEntradaManual()">💾 Guardar y vincular</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL PRESUPUESTO TRANSPORTE -->
+<div class="modal-overlay" id="modal-presupuesto" onclick="if(event.target===this)closeModal('modal-presupuesto')">
+  <div class="modal" style="max-width:620px;max-height:85vh;overflow-y:auto;">
+    <div class="modal-header" style="background:var(--c1);">
+      <div class="modal-title" style="color:#fff;">📧 Presupuesto de transporte</div>
+      <button class="modal-close" onclick="closeModal('modal-presupuesto')" style="color:rgba(255,255,255,.7)">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Revisa y completa los datos. Al pulsar <strong>Abrir correo</strong> se abrirá tu cliente de email con la plantilla lista para enviar.</p>
+      
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+        <div class="form-group"><label class="form-label">Referencia (OT)</label><input class="form-input" id="pres-ot"/></div>
+        <div class="form-group"><label class="form-label">Negocio</label><input class="form-input" id="pres-negocio"/></div>
+        <div class="form-group"><label class="form-label">Artículo</label><input class="form-input" id="pres-articulo"/></div>
+        <div class="form-group"><label class="form-label">Cliente</label><input class="form-input" id="pres-cliente"/></div>
+        <div class="form-group"><label class="form-label">Lugar de carga</label><input class="form-input" id="pres-lugarcarga"/></div>
+        <div class="form-group"><label class="form-label">Destino</label><input class="form-input" id="pres-destino"/></div>
+        <div class="form-group" style="grid-column:span 2"><label class="form-label">Dirección de entrega</label><input class="form-input" id="pres-dirección"/></div>
+        <div class="form-group"><label class="form-label">Fecha de entrega</label><input class="form-input" id="pres-fentrega" type="date"/></div>
+        <div class="form-group"><label class="form-label">Fecha de carga</label><input class="form-input" id="pres-fcarga" type="date"/></div>
+        <div class="form-group"><label class="form-label">Tipo de camión</label><input class="form-input" id="pres-tipocamion"/></div>
+        <div class="form-group"><label class="form-label">Nº pallets</label><input class="form-input" id="pres-pallets"/></div>
+        <div class="form-group"><label class="form-label">Tipo de pallets</label><input class="form-input" id="pres-tipopallets" placeholder="Europeo, americano…"/></div>
+        <div class="form-group"><label class="form-label">¿Es remontable?</label>
+          <select class="form-select" id="pres-remontable"><option value="">—</option><option>Sí</option><option>No</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Peso</label><input class="form-input" id="pres-peso" placeholder="kg"/></div>
+        <div class="form-group"><label class="form-label">Agencia</label><input class="form-input" id="pres-agencia"/></div>
+        <div class="form-group" style="grid-column:span 2"><label class="form-label">Notas adicionales</label><textarea class="form-input" id="pres-notas" rows="2" style="resize:vertical"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-presupuesto')">Cancelar</button>
+      <button class="btn btn-accent" onclick="enviarPresupuesto()">📧 Abrir correo</button>
     </div>
   </div>
 </div>
@@ -1535,8 +1662,8 @@ async function guardarEnvio() {
       agencia:v('f-agencia'), ftrans:v('f-ftrans'), negocio:v('f-negocio'),
       asignado:v('f-asignado'), tipocamion:v('f-tipocamion'), cliente:v('f-cliente'),
       articulos:getArticulos(), refcarga:v('f-refcarga'), pallets:v('f-pallets'),
-      destino:v('f-destino'), lugarcarga:v('f-lugarcarga'), horacarga:v('f-horacarga'),
-      horallegada:v('f-horallegada'), horasalida:v('f-horasalida'),
+      destino:v('f-destino'), lugarcarga:v('f-lugarcarga'), horacarga:(v('f-horacarga')||'').slice(0,5),
+      horallegada:(v('f-horallegada')||'').slice(0,5), horasalida:(v('f-horasalida')||'').slice(0,5),
       peso:v('f-peso'), contenedor:v('f-contenedor'), precinto:v('f-precinto'), notas:v('f-notas'),
       creadoEn:editandoId?(_enviosCache.find(e=>e.id===editandoId)||{}).creadoEn:new Date().toISOString(),
       creadoPor:currentUser,
@@ -1658,6 +1785,7 @@ function renderTabla(){
             ${canDelete?`<div class="act-menu-item danger" onclick="eliminarEnvio('${e.id}');closeActMenus()">✕ Eliminar</div>`:''}
             ${e.transportista?`<div class="act-menu-item" onclick="verTransportista('${e.id}');closeActMenus()">🚛 Ver transportista</div>`:''}
             ${e.transportista?`<div class="act-menu-item" onclick="imprimirFichaConductor('${e.id}');closeActMenus()">🖨 Ficha conductor</div>`:''}
+            <div class="act-menu-item" onclick="abrirPresupuesto('${e.id}');closeActMenus()">📧 Presupuesto transporte</div>
           </div>
         </div>
       </td>
@@ -2326,7 +2454,12 @@ async function exportarHistorico(){
   finally{if(btn){btn.disabled=false;btn.textContent='↓ Exportar CSV';}}
 }
 async function limpiarHistorico(){
-  if(!confirm('¿Limpiar todo el histórico?')) return;
+  if(!confirm('¿Limpiar todo el histórico? Esta acción no se puede deshacer.')) return;
+  const codigo = prompt('Introduce el código de seguridad:');
+  if(codigo !== '8151'){
+    alert('❌ Código incorrecto. No se ha eliminado el histórico.');
+    return;
+  }
   await gsCall('clearHist'); renderHistorico();
 }
 
@@ -3076,6 +3209,94 @@ function _updateHistFilterBtn(col){
   var active=!!_histColFilters[col]&&_histColFilters[col].size>0;
   btn.classList.toggle('active',active);
   btn.textContent=active?'▾●':'▾';
+}
+
+
+function abrirPresupuesto(id){
+  const e = _enviosCache.find(x=>x.id===id)||{};
+  const cs = (e.consegnas||[e.consegna]).filter(Boolean).join(', ')||'';
+  // Pre-rellenar modal
+  document.getElementById('pres-ot').value        = e.refcarga||'';
+  document.getElementById('pres-negocio').value   = e.negocio||'';
+  document.getElementById('pres-articulo').value  = (e.articulos&&e.articulos[0])?e.articulos[0].articulo||'':'';
+  document.getElementById('pres-lugarcarga').value= e.lugarcarga||'';
+  document.getElementById('pres-destino').value   = e.destino||'';
+  document.getElementById('pres-dirección').value = '';
+  document.getElementById('pres-cliente').value   = e.cliente||'';
+  document.getElementById('pres-fentrega').value  = e.fentrega||'';
+  document.getElementById('pres-fcarga').value    = e.fcarga||'';
+  document.getElementById('pres-tipocamion').value= e.tipocamion||'';
+  document.getElementById('pres-pallets').value   = e.pallets||'';
+  document.getElementById('pres-tipopallets').value='';
+  document.getElementById('pres-remontable').value='';
+  document.getElementById('pres-peso').value      = e.peso||'';
+  document.getElementById('pres-agencia').value   = e.agencia||'';
+  document.getElementById('pres-notas').value     = e.notas||'';
+  document.getElementById('modal-presupuesto').classList.add('open');
+}
+
+function enviarPresupuesto(){
+  const g = id => document.getElementById(id)?.value||'';
+  const ot       = g('pres-ot');
+  const negocio  = g('pres-negocio');
+  const articulo = g('pres-articulo');
+  const lc       = g('pres-lugarcarga');
+  const destino  = g('pres-destino');
+  const dir      = g('pres-dirección');
+  const cliente  = g('pres-cliente');
+  const fent     = g('pres-fentrega');
+  const fcarga   = g('pres-fcarga');
+  const tcamion  = g('pres-tipocamion');
+  const pallets  = g('pres-pallets');
+  const tpal     = g('pres-tipopallets');
+  const remon    = g('pres-remontable');
+  const peso     = g('pres-peso');
+  const agencia  = g('pres-agencia');
+  const notas    = g('pres-notas');
+
+  const cuerpo = `Estimados,
+
+Necesitamos presupuesto para el siguiente transporte:
+
+REFERENCIA (OT): ${ot}
+
+INFORMACIÓN DE ENTREGA:
+- Negocio: ${negocio}
+- Artículo: ${articulo}
+- Lugar de carga: ${lc}
+- Destino: ${destino}
+- Dirección de entrega: ${dir}
+- Cliente: ${cliente}
+- Fecha de entrega: ${fent}
+*Con cargo a Bormioli Luigi
+
+INFORMACIÓN DE LA CARGA:
+- Fecha de carga: ${fcarga}
+- Tipo de camión: ${tcamion}
+- Nº pallets: ${pallets}
+- Tipo de pallets: ${tpal}
+- ¿Es remontable?: ${remon}
+- Peso: ${peso}
+*El camión tiene que venir provisto de 2 barras y 2 Eslingas (Cinchas) para sujetar la mercancía.
+
+INFORMACIÓN DE AGENCIA DE TRANSPORTE (a rellenar por la agencia):
+- Agencia de transporte: ${agencia}
+- F. de entrega confirmada por transporte:
+- Matrícula de camión:
+*Necesitamos confirmación de la fecha, hora y contacto del RDV con el que realizaron la reserva.
+
+NOTAS: ${notas}
+
+Quedamos a su disposición para cualquier consulta.
+
+Un saludo,
+Bormioli Luigi — Gestión de Expediciones`;
+
+  const mailtoLink = 'mailto:?subject=Presupuesto%20Transporte%20-%20OT%20' 
+    + encodeURIComponent(ot) 
+    + '&body=' + encodeURIComponent(cuerpo);
+  window.open(mailtoLink);
+  closeModal('modal-presupuesto');
 }
 
 </script>
