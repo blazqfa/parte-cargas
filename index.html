@@ -767,6 +767,34 @@ Bormioli Luigi — Gestión de Expediciones`;
   closeModal('modal-presupuesto');
 }
 
+
+function fmtHora(el){
+  // Auto-insertar : al escribir 4 dígitos: 0800 → 08:00
+  let v = el.value.replace(/[^0-9:]/g,'');
+  if(v.length===4 && !v.includes(':')) v = v.slice(0,2)+':'+v.slice(2);
+  el.value = v;
+}
+
+
+function editarTransportista(envioId){
+  const e=_enviosCache.find(x=>x.id===envioId); if(!e) return;
+  const t=e.transportista||{};
+  closeModal('modal-trans-detail');
+  // Rellenar modal de entrada manual con datos existentes
+  _manualTransEnvioId = envioId;
+  const cs=(e.consegnas||[e.consegna]).filter(Boolean).join(' / ')||'—';
+  document.getElementById('manual-trans-info').innerHTML=
+    `<strong>${cs}</strong> · ${e.cliente||'—'} · ${e.agencia||'—'}<br>
+     <span style="font-size:11px;color:var(--text3)">Modifica los datos del transportista y guarda</span>`;
+  document.getElementById('mt-conductor').value  = t.conductor||'';
+  document.getElementById('mt-dni').value        = t.dni||'';
+  document.getElementById('mt-empresa').value    = t.empresa||'';
+  document.getElementById('mt-nif').value        = t.nif||'';
+  document.getElementById('mt-matricula').value  = t.matricula||'';
+  document.getElementById('mt-remolque').value   = t.remolque||'';
+  document.getElementById('modal-trans-manual').classList.add('open');
+}
+
 </script>
 </head>
 <body>
@@ -1019,15 +1047,15 @@ Bormioli Luigi — Gestión de Expediciones`;
         <div class="form-row-4">
           <div class="form-group">
             <label class="form-label">Hora carga</label>
-            <input class="form-input" type="time" id="f-horacarga"/>
+            <input class="form-input" type="text" id="f-horacarga" placeholder="08:00" maxlength="5" oninput="fmtHora(this)"/>
           </div>
           <div class="form-group">
             <label class="form-label">Hora llegada</label>
-            <input class="form-input" type="time" id="f-horallegada"/>
+            <input class="form-input" type="text" id="f-horallegada" placeholder="08:00" maxlength="5" oninput="fmtHora(this)"/>
           </div>
           <div class="form-group">
             <label class="form-label">Hora salida</label>
-            <input class="form-input" type="time" id="f-horasalida"/>
+            <input class="form-input" type="text" id="f-horasalida" placeholder="08:00" maxlength="5" oninput="fmtHora(this)"/>
           </div>
           <div class="form-group">
             <label class="form-label">Peso camión/contenedor</label>
@@ -1321,6 +1349,7 @@ Bormioli Luigi — Gestión de Expediciones`;
     <div id="modal-trans-content"></div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('modal-trans-detail')">Cerrar</button>
+      <button class="btn btn-secondary" id="btn-edit-trans" onclick="editarTransportista(this.dataset.envioId)">✎ Editar datos</button>
       <button class="btn btn-accent" id="btn-print-ficha" onclick="imprimirFichaConductor(document.getElementById('btn-print-ficha').dataset.envioId)">🖨 Imprimir ficha conductor</button>
     </div>
   </div>
@@ -1989,6 +2018,7 @@ function verTransportista(id){
       <div class="expand-item" style="grid-column:span 2;"><span class="expand-label">Consegnas</span><span class="expand-val">${(t.consegnas||[]).join(', ')||'—'}</span></div>
     </div>`;
   document.getElementById('btn-print-ficha').dataset.envioId = id;
+  document.getElementById('btn-edit-trans').dataset.envioId = id;
   document.getElementById('modal-trans-detail').classList.add('open');
 }
 
@@ -3313,6 +3343,34 @@ Bormioli Luigi — Gestión de Expediciones`;
     + '&body=' + encodeURIComponent(cuerpo);
   window.open(mailtoLink);
   closeModal('modal-presupuesto');
+}
+
+
+function fmtHora(el){
+  // Auto-insertar : al escribir 4 dígitos: 0800 → 08:00
+  let v = el.value.replace(/[^0-9:]/g,'');
+  if(v.length===4 && !v.includes(':')) v = v.slice(0,2)+':'+v.slice(2);
+  el.value = v;
+}
+
+
+function editarTransportista(envioId){
+  const e=_enviosCache.find(x=>x.id===envioId); if(!e) return;
+  const t=e.transportista||{};
+  closeModal('modal-trans-detail');
+  // Rellenar modal de entrada manual con datos existentes
+  _manualTransEnvioId = envioId;
+  const cs=(e.consegnas||[e.consegna]).filter(Boolean).join(' / ')||'—';
+  document.getElementById('manual-trans-info').innerHTML=
+    `<strong>${cs}</strong> · ${e.cliente||'—'} · ${e.agencia||'—'}<br>
+     <span style="font-size:11px;color:var(--text3)">Modifica los datos del transportista y guarda</span>`;
+  document.getElementById('mt-conductor').value  = t.conductor||'';
+  document.getElementById('mt-dni').value        = t.dni||'';
+  document.getElementById('mt-empresa').value    = t.empresa||'';
+  document.getElementById('mt-nif').value        = t.nif||'';
+  document.getElementById('mt-matricula').value  = t.matricula||'';
+  document.getElementById('mt-remolque').value   = t.remolque||'';
+  document.getElementById('modal-trans-manual').classList.add('open');
 }
 
 </script>
