@@ -1821,7 +1821,6 @@ function renderTabla(){
             ${canEdit?`<div class="act-menu-item" onclick="editarEnvio('${e.id}');closeActMenus()">✎ Editar</div>`:''}
             ${canDelete?`<div class="act-menu-item danger" onclick="eliminarEnvio('${e.id}');closeActMenus()">✕ Eliminar</div>`:''}
             ${e.transportista?`<div class="act-menu-item" onclick="verTransportista('${e.id}');closeActMenus()">🚛 Ver transportista</div>`:''}
-            ${e.transportista?`<div class="act-menu-item" onclick="imprimirFichaConductor('${e.id}');closeActMenus()">🖨 Ficha conductor</div>`:''}
             <div class="act-menu-item" onclick="abrirPresupuesto('${e.id}');closeActMenus()">📧 Presupuesto transporte</div>
           </div>
         </div>
@@ -1877,6 +1876,10 @@ function renderTabla(){
             <div class="expand-item"><span class="expand-label">Remolque</span><span class="expand-val" style="font-family:monospace;">${t.remolque||'—'}</span></div>
             <div class="expand-item"><span class="expand-label">Ref. carga</span><span class="expand-val">${(t.refs||[]).join(', ')||'—'}</span></div>
             <div class="expand-item"><span class="expand-label">Consegnas</span><span class="expand-val">${(t.consegnas||[]).join(', ')||'—'}</span></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);">
+            <button class="btn btn-xs" onclick="editarTransportista('${e.id}')" style="background:var(--c5);color:var(--c1);border:1px solid var(--c3);">✎ Modificar datos</button>
+            <button class="btn btn-xs" onclick="imprimirFichaConductor('${e.id}')">🖨 Imprimir ficha conductor</button>
           </div></div>`;
       })():`<div style="margin-top:.875rem;border-top:1px dashed var(--border);padding-top:.75rem;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
         <div style="font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px;"><span>🚛</span><span>Transportista pendiente de registrarse</span></div>
