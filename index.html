@@ -602,14 +602,38 @@ function closeActMenus(){
 
 
 // ── HISTORICO COLUMN FILTERS ──────────────────────────────────────
-const HIST_FILTER_COLS = ['consegna','refcarga','cliente','estado','fllegada','fentrega','fcarga','agencia','asignado','negocio','tipocamion','finalizadoEn'];
+const HIST_FILTER_COLS = ['consegna','refcarga','cliente','estado','fllegada','fentrega','fcarga','ftrans','agencia','asignado','negocio','tipocamion','destino','lugarcarga','conductor','empresa','finalizadoEn'];
 let _histColFilters = {};
 
+// Columnas de fecha que se agrupan por Año › Mes
+const HIST_DATE_COLS_SET = new Set(['fentrega','fcarga','fllegada','ftrans','finalizadoEn']);
+
+function _dateToYearMonth(v){
+  if(!v) return '';
+  var m=String(v).match(/^(\d{4})-(\d{2})/);
+  if(m) return m[1]+'-'+m[2];
+  var m2=String(v).match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if(m2) return m2[3]+'-'+m2[2];
+  return String(v).substring(0,7);
+}
+
+function _ymLabel(ym){
+  const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  var p=ym.split('-');
+  if(p.length===2){var mi=parseInt(p[1],10)-1;return p[0]+' · '+(meses[mi]||p[1]);}
+  return ym;
+}
+
 function getHistColValues(col){
+  const isDate=HIST_DATE_COLS_SET.has(col);
+  const transFields=new Set(['conductor','empresa']);
   const vals=new Set();
   _histData.forEach(function(e){
-    var v=col==='consegna'?(e.consegnas||[e.consegna]).filter(Boolean)[0]||'':String(e[col]||'');
-    if(v) vals.add(v);
+    var v;
+    if(col==='consegna') v=(e.consegnas||[e.consegna]).filter(Boolean)[0]||'';
+    else if(transFields.has(col)) v=String((e.transportista||{})[col]||'');
+    else v=String(e[col]||'');
+    if(v){ if(isDate) vals.add(_dateToYearMonth(v)); else vals.add(v); }
   });
   return [...vals].sort();
 }
@@ -624,15 +648,17 @@ function toggleHistFilter(col){
   var h='<div class="col-filter-search"><input placeholder="Buscar..." id="hcfs-'+col+'" style="border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;width:100%;outline:none;"/></div>';
   h+='<div id="hcflist-'+col+'">';
   h+='<div class="col-filter-item"><input type="checkbox" id="hcfall-'+col+'"'+(selected.size===0?' checked':'')+'/> <label style="cursor:pointer" for="hcfall-'+col+'">(Todos)</label></div>';
+  var isDate=HIST_DATE_COLS_SET.has(col);
   vals.forEach(function(v){
     var esc=v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    h+='<div class="col-filter-item" data-val="'+esc+'"><input type="checkbox"'+(selected.has(v)?' checked':'')+'/> <span>'+esc+'</span></div>';
+    var lbl=isDate?_ymLabel(v):esc;
+    h+='<div class="col-filter-item" data-val="'+esc+'"><input type="checkbox"'+(selected.has(v)?' checked':'')+'/> <span>'+lbl+'</span></div>';
   });
   h+='</div><div class="col-filter-actions"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:3px 8px">✕ Limpiar</button></div>';
   dd.innerHTML=h;
   dd.classList.add('open');
   var si=document.getElementById('hcfs-'+col);
-  if(si) si.addEventListener('input',function(){ 
+  if(si) si.addEventListener('input',function(){
     var q=this.value.toLowerCase();
     document.querySelectorAll('#hcflist-'+col+' .col-filter-item[data-val]').forEach(function(item){
       item.style.display=(item.querySelector('span')?.textContent||'').toLowerCase().includes(q)?'':'none';
@@ -846,7 +872,7 @@ function editarTransportista(envioId){
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 3"/></svg>
       <span>Histórico</span>
     </button>
-    <button class="nav-tab" data-page="tracking" onclick="goPage('tracking',this)" id="tab-tracking" style="display:none;">📦 Tracking</button>
+    <!-- Tracking eliminado -->
     <button class="nav-tab" data-page="admin" onclick="goPage('admin',this)" id="tab-admin" style="display:none;">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
       <span>Admin</span>
@@ -1087,33 +1113,6 @@ function editarTransportista(envioId){
 
 
   <!-- TRACKING — CUSTOMER SERVICE -->
-  <div class="page" id="page-tracking">
-    <div class="section-header">
-      <div>
-        <div class="section-title">📦 Seguimiento de expediciones</div>
-        <div style="font-size:12px;color:var(--text2);margin-top:2px">Vista de solo lectura · Customer Service</div>
-      </div>
-      <input class="search-input" id="track-busq" placeholder="Buscar consegna, cliente, agencia…" oninput="renderTracking()" style="width:220px"/>
-      <select class="form-select" id="track-negocio" onchange="renderTracking()" style="width:auto;padding:6px 10px;font-size:13px;">
-        <option value="">Todos los negocios</option>
-        <option>BEAUTY</option>
-        <option>CASALINGO</option>
-        <option>STOCK MASTER</option>
-      </select>
-      <select class="form-select" id="track-estado" onchange="renderTracking()" style="width:auto;padding:6px 10px;font-size:13px;">
-        <option value="">Todos los estados</option>
-        <option>PTE. DE CONSEGNA</option>
-        <option>SIN ORDEN</option>
-        <option>EN CURSO</option>
-        <option>CONSEÑADO</option>
-        <option>CARGANDO EN EL MUELLE</option>
-        <option>CARGADO</option>
-        <option>INCIDENCIA</option>
-      </select>
-    </div>
-    <div id="tracking-list"></div>
-  </div>
-
   <!-- SAP -->
   <div class="page" id="page-sap">
     <div class="section-header">
@@ -1158,7 +1157,7 @@ function editarTransportista(envioId){
     <div class="section-header">
       <div class="section-title">Histórico de expediciones</div>
       <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
-        <input class="search-input" id="hist-busq" placeholder="Buscar consegna, OT, cliente, agencia…" oninput="filtrarHistorico()" style="width:280px;"/>
+        <input class="search-input" id="hist-busq" placeholder="Buscar en todas las columnas…" oninput="filtrarHistorico()" style="width:300px;"/>
         <select class="form-select" id="hist-negocio" onchange="filtrarHistorico()" style="padding:6px 10px;font-size:12px;">
           <option value="">Todos los negocios</option>
           <option>BEAUTY</option>
@@ -1183,14 +1182,20 @@ function editarTransportista(envioId){
             <th class="th-sort" onclick="sortHist('fllegada')" style="position:relative;">F.Llegada <span id="hsi-fllegada"></span><span class="col-filter-btn" id="hcfbtn-fllegada" onclick="event.stopPropagation();toggleHistFilter('fllegada')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-fllegada"></div></th>
             <th class="th-sort" onclick="sortHist('fentrega')" style="position:relative;">F.Entrega <span id="hsi-fentrega"></span><span class="col-filter-btn" id="hcfbtn-fentrega" onclick="event.stopPropagation();toggleHistFilter('fentrega')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-fentrega"></div></th>
             <th class="th-sort" onclick="sortHist('fcarga')" style="position:relative;">F.Carga <span id="hsi-fcarga"></span><span class="col-filter-btn" id="hcfbtn-fcarga" onclick="event.stopPropagation();toggleHistFilter('fcarga')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-fcarga"></div></th>
-            <th>F.Trans.</th>
+            <th class="th-sort" onclick="sortHist('ftrans')" style="position:relative;">F.Trans. <span id="hsi-ftrans"></span><span class="col-filter-btn" id="hcfbtn-ftrans" onclick="event.stopPropagation();toggleHistFilter('ftrans')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-ftrans"></div></th>
             <th class="th-sort" onclick="sortHist('agencia')" style="position:relative;">Agencia <span id="hsi-agencia"></span><span class="col-filter-btn" id="hcfbtn-agencia" onclick="event.stopPropagation();toggleHistFilter('agencia')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-agencia"></div></th>
             <th class="th-sort" onclick="sortHist('asignado')" style="position:relative;">Asignado <span id="hsi-asignado"></span><span class="col-filter-btn" id="hcfbtn-asignado" onclick="event.stopPropagation();toggleHistFilter('asignado')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-asignado"></div></th>
             <th class="th-sort" onclick="sortHist('negocio')" style="position:relative;">Negocio <span id="hsi-negocio"></span><span class="col-filter-btn" id="hcfbtn-negocio" onclick="event.stopPropagation();toggleHistFilter('negocio')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-negocio"></div></th>
-            <th>Tipo camión</th><th>Pallets</th><th>Destino</th><th>Lugar carga</th>
+            <th class="th-sort" onclick="sortHist('tipocamion')" style="position:relative;">Tipo camión <span id="hsi-tipocamion"></span><span class="col-filter-btn" id="hcfbtn-tipocamion" onclick="event.stopPropagation();toggleHistFilter('tipocamion')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-tipocamion"></div></th>
+            <th class="th-sort" onclick="sortHist('pallets')" style="position:relative;">Pallets <span id="hsi-pallets"></span></th>
+            <th class="th-sort" onclick="sortHist('destino')" style="position:relative;">Destino <span id="hsi-destino"></span><span class="col-filter-btn" id="hcfbtn-destino" onclick="event.stopPropagation();toggleHistFilter('destino')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-destino"></div></th>
+            <th class="th-sort" onclick="sortHist('lugarcarga')" style="position:relative;">Lugar carga <span id="hsi-lugarcarga"></span><span class="col-filter-btn" id="hcfbtn-lugarcarga" onclick="event.stopPropagation();toggleHistFilter('lugarcarga')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-lugarcarga"></div></th>
             <th>H.Carga</th><th>H.Llegada</th><th>H.Salida</th>
             <th>Peso</th><th>Contenedor</th><th>Precinto</th>
-            <th>Conductor</th><th>DNI</th><th>Empresa trans.</th><th>Matrícula</th><th>Remolque</th>
+            <th class="th-sort" onclick="sortHist('conductor')" style="position:relative;">Conductor <span id="hsi-conductor"></span><span class="col-filter-btn" id="hcfbtn-conductor" onclick="event.stopPropagation();toggleHistFilter('conductor')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-conductor"></div></th>
+            <th>DNI</th>
+            <th class="th-sort" onclick="sortHist('empresa')" style="position:relative;">Empresa trans. <span id="hsi-empresa"></span><span class="col-filter-btn" id="hcfbtn-empresa" onclick="event.stopPropagation();toggleHistFilter('empresa')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-empresa"></div></th>
+            <th>Matrícula</th><th>Remolque</th>
             <th>Orden</th><th>Artículo</th><th>Línea</th><th>Núm. PZ</th>
             <th>Notas</th><th class="th-sort" onclick="sortHist('finalizadoEn')" style="position:relative;">F. Finalizado <span id="hsi-finalizadoEn"></span><span class="col-filter-btn" id="hcfbtn-finalizadoEn" onclick="event.stopPropagation();toggleHistFilter('finalizadoEn')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-finalizadoEn"></div></th>
           </tr>
@@ -1510,7 +1515,7 @@ function startPolling() {
       const r = await gsCall('getEnvios');
       const nd=r.data||[];
       const h=nd.map(e=>e.id+'|'+e.estado).join(',');
-      if (h !== _lastHash) { _lastHash=h; _enviosCache=nd; renderTabla(); try{updateKPIs();}catch(ex){} try{if(document.getElementById('page-tracking').classList.contains('active'))renderTracking();}catch(ex){} _showSyncToast('📡 Datos actualizados'); }
+      if (h !== _lastHash) { _lastHash=h; _enviosCache=nd; renderTabla(); try{updateKPIs();}catch(ex){} _showSyncToast('📡 Datos actualizados'); }
     } catch(e){}
   }, 10000);
 }
@@ -1601,11 +1606,10 @@ async function doLogin() {
   document.getElementById('nav-role').textContent=found.rol;
   document.getElementById('tab-admin').style.display=found.rol==='ADMINISTRADOR'?'':'none';
   document.getElementById('tab-nuevo').style.display=(found.rol==='CUSTOMER_SERVICE'||found.rol==='INVITADO'||(found.permisos&&found.permisos.nuevo===false))?'none':'';
-  document.getElementById('tab-tracking').style.display='';
   const tabSap=document.querySelector('[data-page="sap"]');
   if(tabSap) tabSap.style.display=(found.rol==='INVITADO')?'none':'';
   if(found.rol==='CUSTOMER_SERVICE'){
-    goPage('tracking',document.getElementById('tab-tracking'));
+    goPage('historico',document.querySelector('[data-page="historico"]'));
   }
   if(found.rol==='ADMINISTRADOR') document.getElementById('hist-admin-tools').style.display='flex';
   addField('consegnas-form-container','consegna-form');
@@ -1629,7 +1633,6 @@ function goPage(id,btn) {
   document.getElementById('page-'+id).classList.add('active');
   if(btn) btn.classList.add('active');
   if(id==='historico') renderHistorico();
-  if(id==='tracking')  renderTracking();
   if(id==='sap')        initSAP();
   if(id==='admin') renderAdmin();
   if(id==='nuevo'&&!editandoId) resetFormEnvio();
@@ -2373,30 +2376,53 @@ function filtrarHistorico(){
   if(busq) lista = lista.filter(e=>{
     const cs = (e.consegnas||[e.consegna]).filter(Boolean).join(' ');
     const t = e.transportista||{};
+    const arts = (e.articulos||[]).map(a=>[a.orden,a.articulo,a.linea,a.pz].filter(Boolean).join(' ')).join(' ');
     return cs.toLowerCase().includes(busq)
       ||(e.refcarga||'').toLowerCase().includes(busq)
       ||(e.cliente||'').toLowerCase().includes(busq)
       ||(e.agencia||'').toLowerCase().includes(busq)
       ||(e.asignado||'').toLowerCase().includes(busq)
-      ||(t.conductor||'').toLowerCase().includes(busq)
-      ||(t.matricula||'').toLowerCase().includes(busq)
+      ||(e.negocio||'').toLowerCase().includes(busq)
+      ||(e.tipocamion||'').toLowerCase().includes(busq)
+      ||(e.destino||'').toLowerCase().includes(busq)
+      ||(e.lugarcarga||'').toLowerCase().includes(busq)
+      ||(e.estado||'').toLowerCase().includes(busq)
+      ||(e.fllegada||'').toLowerCase().includes(busq)
+      ||(e.fentrega||'').toLowerCase().includes(busq)
+      ||(e.fcarga||'').toLowerCase().includes(busq)
+      ||(e.ftrans||'').toLowerCase().includes(busq)
+      ||(String(e.pallets||'')).toLowerCase().includes(busq)
+      ||(e.contenedor||'').toLowerCase().includes(busq)
+      ||(e.precinto||'').toLowerCase().includes(busq)
       ||(e.notas||'').toLowerCase().includes(busq)
-      ||(e.estado||'').toLowerCase().includes(busq);
+      ||(t.conductor||'').toLowerCase().includes(busq)
+      ||(t.dni||'').toLowerCase().includes(busq)
+      ||(t.empresa||'').toLowerCase().includes(busq)
+      ||(t.matricula||'').toLowerCase().includes(busq)
+      ||(t.remolque||'').toLowerCase().includes(busq)
+      ||arts.toLowerCase().includes(busq);
   });
   if(negocio) lista = lista.filter(e=>e.negocio===negocio);
   // Filtros por columna del histórico
+  const _transF=new Set(['conductor','empresa']);
   HIST_FILTER_COLS.forEach(function(col){
     if(_histColFilters[col]&&_histColFilters[col].size>0){
+      var isDate=HIST_DATE_COLS_SET.has(col);
       lista=lista.filter(function(e){
-        var v=col==='consegna'?(e.consegnas||[e.consegna]).filter(Boolean)[0]||'':String(e[col]||'');
+        var v;
+        if(col==='consegna') v=(e.consegnas||[e.consegna]).filter(Boolean)[0]||'';
+        else if(_transF.has(col)) v=String((e.transportista||{})[col]||'');
+        else v=String(e[col]||'');
+        if(isDate) v=_dateToYearMonth(v);
         return _histColFilters[col].has(v);
       });
     }
   });
   if(_histSortCol){
+    const _tF=new Set(['conductor','empresa']);
     lista.sort((a,b)=>{
-      const va=String(a[_histSortCol]||'').toLowerCase();
-      const vb=String(b[_histSortCol]||'').toLowerCase();
+      const va=_tF.has(_histSortCol)?String((a.transportista||{})[_histSortCol]||'').toLowerCase():String(a[_histSortCol]||'').toLowerCase();
+      const vb=_tF.has(_histSortCol)?String((b.transportista||{})[_histSortCol]||'').toLowerCase():String(b[_histSortCol]||'').toLowerCase();
       return _histSortDir*va.localeCompare(vb);
     });
   }
@@ -3183,14 +3209,38 @@ function closeActMenus(){
 
 
 // ── HISTORICO COLUMN FILTERS ──────────────────────────────────────
-const HIST_FILTER_COLS = ['consegna','refcarga','cliente','estado','fllegada','fentrega','fcarga','agencia','asignado','negocio','tipocamion','finalizadoEn'];
+const HIST_FILTER_COLS = ['consegna','refcarga','cliente','estado','fllegada','fentrega','fcarga','ftrans','agencia','asignado','negocio','tipocamion','destino','lugarcarga','conductor','empresa','finalizadoEn'];
 let _histColFilters = {};
 
+// Columnas de fecha que se agrupan por Año › Mes
+const HIST_DATE_COLS_SET = new Set(['fentrega','fcarga','fllegada','ftrans','finalizadoEn']);
+
+function _dateToYearMonth(v){
+  if(!v) return '';
+  var m=String(v).match(/^(\d{4})-(\d{2})/);
+  if(m) return m[1]+'-'+m[2];
+  var m2=String(v).match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if(m2) return m2[3]+'-'+m2[2];
+  return String(v).substring(0,7);
+}
+
+function _ymLabel(ym){
+  const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  var p=ym.split('-');
+  if(p.length===2){var mi=parseInt(p[1],10)-1;return p[0]+' · '+(meses[mi]||p[1]);}
+  return ym;
+}
+
 function getHistColValues(col){
+  const isDate=HIST_DATE_COLS_SET.has(col);
+  const transFields=new Set(['conductor','empresa']);
   const vals=new Set();
   _histData.forEach(function(e){
-    var v=col==='consegna'?(e.consegnas||[e.consegna]).filter(Boolean)[0]||'':String(e[col]||'');
-    if(v) vals.add(v);
+    var v;
+    if(col==='consegna') v=(e.consegnas||[e.consegna]).filter(Boolean)[0]||'';
+    else if(transFields.has(col)) v=String((e.transportista||{})[col]||'');
+    else v=String(e[col]||'');
+    if(v){ if(isDate) vals.add(_dateToYearMonth(v)); else vals.add(v); }
   });
   return [...vals].sort();
 }
@@ -3205,15 +3255,17 @@ function toggleHistFilter(col){
   var h='<div class="col-filter-search"><input placeholder="Buscar..." id="hcfs-'+col+'" style="border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;width:100%;outline:none;"/></div>';
   h+='<div id="hcflist-'+col+'">';
   h+='<div class="col-filter-item"><input type="checkbox" id="hcfall-'+col+'"'+(selected.size===0?' checked':'')+'/> <label style="cursor:pointer" for="hcfall-'+col+'">(Todos)</label></div>';
+  var isDate=HIST_DATE_COLS_SET.has(col);
   vals.forEach(function(v){
     var esc=v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    h+='<div class="col-filter-item" data-val="'+esc+'"><input type="checkbox"'+(selected.has(v)?' checked':'')+'/> <span>'+esc+'</span></div>';
+    var lbl=isDate?_ymLabel(v):esc;
+    h+='<div class="col-filter-item" data-val="'+esc+'"><input type="checkbox"'+(selected.has(v)?' checked':'')+'/> <span>'+lbl+'</span></div>';
   });
   h+='</div><div class="col-filter-actions"><button class="btn btn-sm btn-danger" style="font-size:10px;padding:3px 8px">✕ Limpiar</button></div>';
   dd.innerHTML=h;
   dd.classList.add('open');
   var si=document.getElementById('hcfs-'+col);
-  if(si) si.addEventListener('input',function(){ 
+  if(si) si.addEventListener('input',function(){
     var q=this.value.toLowerCase();
     document.querySelectorAll('#hcflist-'+col+' .col-filter-item[data-val]').forEach(function(item){
       item.style.display=(item.querySelector('span')?.textContent||'').toLowerCase().includes(q)?'':'none';
