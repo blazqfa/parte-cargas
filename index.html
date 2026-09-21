@@ -606,7 +606,7 @@ function closeActMenus(){
 
 
 // ── HISTORICO COLUMN FILTERS ──────────────────────────────────────
-const HIST_FILTER_COLS = ['consegna','refcarga','cliente','estado','fllegada','fentrega','fcarga','ftrans','agencia','asignado','negocio','tipocamion','destino','lugarcarga','conductor','empresa','finalizadoEn'];
+const HIST_FILTER_COLS = ['consegna','refcarga','cliente','estado','fllegada','fentrega','fcarga','ftrans','agencia','asignado','negocio','tipocamion','destino','lugarcarga','conductor','empresa','art_orden','art_articulo','finalizadoEn'];
 let _histColFilters = {};
 
 // Columnas de fecha que se agrupan por Año › Mes
@@ -631,13 +631,20 @@ function _ymLabel(ym){
 function getHistColValues(col){
   const isDate=HIST_DATE_COLS_SET.has(col);
   const transFields=new Set(['conductor','empresa']);
+  const artFields={'art_orden':'orden','art_articulo':'articulo'};
   const vals=new Set();
   _histData.forEach(function(e){
-    var v;
-    if(col==='consegna') v=(e.consegnas||[e.consegna]).filter(Boolean)[0]||'';
-    else if(transFields.has(col)) v=String((e.transportista||{})[col]||'');
-    else v=String(e[col]||'');
-    if(v){ if(isDate) vals.add(_dateToYearMonth(v)); else vals.add(v); }
+    if(artFields[col]){
+      // campo dentro de e.articulos[]
+      var artKey=artFields[col];
+      (e.articulos||[]).forEach(function(a){ var v=String(a[artKey]||''); if(v) vals.add(v); });
+    } else {
+      var v;
+      if(col==='consegna') v=(e.consegnas||[e.consegna]).filter(Boolean)[0]||'';
+      else if(transFields.has(col)) v=String((e.transportista||{})[col]||'');
+      else v=String(e[col]||'');
+      if(v){ if(isDate) vals.add(_dateToYearMonth(v)); else vals.add(v); }
+    }
   });
   return [...vals].sort();
 }
@@ -1200,7 +1207,9 @@ function editarTransportista(envioId){
             <th>DNI</th>
             <th class="th-sort" onclick="sortHist('empresa')" style="position:relative;">Empresa trans. <span id="hsi-empresa"></span><span class="col-filter-btn" id="hcfbtn-empresa" onclick="event.stopPropagation();toggleHistFilter('empresa')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-empresa"></div></th>
             <th>Matrícula</th><th>Remolque</th>
-            <th>Orden</th><th>Artículo</th><th>Línea</th><th>Núm. PZ</th>
+            <th class="th-sort" onclick="sortHist('art_orden')" style="position:relative;">Orden <span id="hsi-art_orden"></span><span class="col-filter-btn" id="hcfbtn-art_orden" onclick="event.stopPropagation();toggleHistFilter('art_orden')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-art_orden"></div></th>
+            <th class="th-sort" onclick="sortHist('art_articulo')" style="position:relative;">Artículo <span id="hsi-art_articulo"></span><span class="col-filter-btn" id="hcfbtn-art_articulo" onclick="event.stopPropagation();toggleHistFilter('art_articulo')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-art_articulo"></div></th>
+            <th>Línea</th><th>Núm. PZ</th>
             <th>Notas</th><th class="th-sort" onclick="sortHist('finalizadoEn')" style="position:relative;">F. Finalizado <span id="hsi-finalizadoEn"></span><span class="col-filter-btn" id="hcfbtn-finalizadoEn" onclick="event.stopPropagation();toggleHistFilter('finalizadoEn')" title="Filtrar">▾</span><div class="col-filter-dropdown" id="hcfd-finalizadoEn"></div></th>
           </tr>
         </thead>
@@ -2434,10 +2443,16 @@ function filtrarHistorico(){
   if(negocio) lista = lista.filter(e=>e.negocio===negocio);
   // Filtros por columna del histórico
   const _transF=new Set(['conductor','empresa']);
+  const _artFields={'art_orden':'orden','art_articulo':'articulo'};
   HIST_FILTER_COLS.forEach(function(col){
     if(_histColFilters[col]&&_histColFilters[col].size>0){
       var isDate=HIST_DATE_COLS_SET.has(col);
       lista=lista.filter(function(e){
+        if(_artFields[col]){
+          // Filtrar: el envío pasa si ALGUNO de sus artículos coincide
+          var artKey=_artFields[col];
+          return (e.articulos||[]).some(function(a){ return _histColFilters[col].has(String(a[artKey]||'')); });
+        }
         var v;
         if(col==='consegna') v=(e.consegnas||[e.consegna]).filter(Boolean)[0]||'';
         else if(_transF.has(col)) v=String((e.transportista||{})[col]||'');
@@ -2449,10 +2464,14 @@ function filtrarHistorico(){
   });
   if(_histSortCol){
     const _tF=new Set(['conductor','empresa']);
+    const _aF={'art_orden':'orden','art_articulo':'articulo'};
     lista.sort((a,b)=>{
-      const va=_tF.has(_histSortCol)?String((a.transportista||{})[_histSortCol]||'').toLowerCase():String(a[_histSortCol]||'').toLowerCase();
-      const vb=_tF.has(_histSortCol)?String((b.transportista||{})[_histSortCol]||'').toLowerCase():String(b[_histSortCol]||'').toLowerCase();
-      return _histSortDir*va.localeCompare(vb);
+      function getV(e){
+        if(_aF[_histSortCol]) return String((e.articulos&&e.articulos[0]?e.articulos[0][_aF[_histSortCol]]:'')||'').toLowerCase();
+        if(_tF.has(_histSortCol)) return String((e.transportista||{})[_histSortCol]||'').toLowerCase();
+        return String(e[_histSortCol]||'').toLowerCase();
+      }
+      return _histSortDir*getV(a).localeCompare(getV(b));
     });
   }
   const count = document.getElementById('hist-count');
@@ -3238,7 +3257,7 @@ function closeActMenus(){
 
 
 // ── HISTORICO COLUMN FILTERS ──────────────────────────────────────
-const HIST_FILTER_COLS = ['consegna','refcarga','cliente','estado','fllegada','fentrega','fcarga','ftrans','agencia','asignado','negocio','tipocamion','destino','lugarcarga','conductor','empresa','finalizadoEn'];
+const HIST_FILTER_COLS = ['consegna','refcarga','cliente','estado','fllegada','fentrega','fcarga','ftrans','agencia','asignado','negocio','tipocamion','destino','lugarcarga','conductor','empresa','art_orden','art_articulo','finalizadoEn'];
 let _histColFilters = {};
 
 // Columnas de fecha que se agrupan por Año › Mes
@@ -3263,13 +3282,20 @@ function _ymLabel(ym){
 function getHistColValues(col){
   const isDate=HIST_DATE_COLS_SET.has(col);
   const transFields=new Set(['conductor','empresa']);
+  const artFields={'art_orden':'orden','art_articulo':'articulo'};
   const vals=new Set();
   _histData.forEach(function(e){
-    var v;
-    if(col==='consegna') v=(e.consegnas||[e.consegna]).filter(Boolean)[0]||'';
-    else if(transFields.has(col)) v=String((e.transportista||{})[col]||'');
-    else v=String(e[col]||'');
-    if(v){ if(isDate) vals.add(_dateToYearMonth(v)); else vals.add(v); }
+    if(artFields[col]){
+      // campo dentro de e.articulos[]
+      var artKey=artFields[col];
+      (e.articulos||[]).forEach(function(a){ var v=String(a[artKey]||''); if(v) vals.add(v); });
+    } else {
+      var v;
+      if(col==='consegna') v=(e.consegnas||[e.consegna]).filter(Boolean)[0]||'';
+      else if(transFields.has(col)) v=String((e.transportista||{})[col]||'');
+      else v=String(e[col]||'');
+      if(v){ if(isDate) vals.add(_dateToYearMonth(v)); else vals.add(v); }
+    }
   });
   return [...vals].sort();
 }
