@@ -883,6 +883,10 @@ function editarTransportista(envioId){
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 3"/></svg>
       <span>Histórico</span>
     </button>
+    <button class="nav-tab" data-page="checklists" onclick="goPage('checklists',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>
+      <span>Checklists</span>
+    </button>
     <!-- Tracking eliminado -->
     <button class="nav-tab" data-page="admin" onclick="goPage('admin',this)" id="tab-admin" style="display:none;">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
@@ -1444,6 +1448,68 @@ function editarTransportista(envioId){
       <button class="btn" onclick="closeModal('modal-user')">Cancelar</button>
       <button class="btn btn-accent" onclick="guardarUser()">Guardar</button>
     </div>
+  </div>
+</div>
+
+<!-- PÁGINA CHECKLISTS -->
+<div class="page" id="page-checklists" style="display:none;">
+  <div class="section-header">
+    <div class="section-title">📋 Checklists de Camiones</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;max-width:900px;">
+    <!-- LLEGADA -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);">
+      <div style="background:#0d2340;padding:20px 24px;border-bottom:3px solid #c8a84b;">
+        <div style="color:#c8a84b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px;">Antes de la carga</div>
+        <div style="color:#fff;font-size:18px;font-weight:700;">🚛 Check List Llegada</div>
+        <div style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:4px;">Inspección del vehículo al llegar</div>
+      </div>
+      <div style="padding:24px;">
+        <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:20px;">
+          Registro de la inspección visual del camión <strong>antes de iniciar la carga</strong>. Comprueba el estado estructural, limpieza, ausencia de animales, estado de paletas, cierre y dimensiones.
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <a href="checklist-llegada.html" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:#0d2340;color:#fff;text-decoration:none;padding:10px 20px;border-radius:var(--radius);font-size:13px;font-weight:600;transition:opacity .15s;" onmouseover="this.style.opacity='.82'" onmouseout="this.style.opacity='1'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Abrir formulario
+          </a>
+          <button onclick="verRegistrosChecklist('LLEGADA')" style="display:inline-flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:10px 16px;border-radius:var(--radius);font-size:13px;cursor:pointer;font-family:inherit;transition:all .15s;" onmouseover="this.style.borderColor='var(--c1)';this.style.color='var(--c1)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text)'">
+            📊 Ver registros
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- CARGA -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);">
+      <div style="background:#0d2340;padding:20px 24px;border-bottom:3px solid #c8a84b;">
+        <div style="color:#c8a84b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px;">Después de la carga</div>
+        <div style="color:#fff;font-size:18px;font-weight:700;">📦 Check List Carga</div>
+        <div style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:4px;">Registro de pallets y estado tras cargar</div>
+      </div>
+      <div style="padding:24px;">
+        <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:20px;">
+          Registro del proceso de carga <strong>una vez finalizada</strong>. Anota el número de pallets cargados, cualquier anomalía y adjunta fotos de la carga.
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <a href="checklist-carga.html" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:#0d2340;color:#fff;text-decoration:none;padding:10px 20px;border-radius:var(--radius);font-size:13px;font-weight:600;transition:opacity .15s;" onmouseover="this.style.opacity='.82'" onmouseout="this.style.opacity='1'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Abrir formulario
+          </a>
+          <button onclick="verRegistrosChecklist('CARGA')" style="display:inline-flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:10px 16px;border-radius:var(--radius);font-size:13px;cursor:pointer;font-family:inherit;transition:all .15s;" onmouseover="this.style.borderColor='var(--c1)';this.style.color='var(--c1)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text)'">
+            📊 Ver registros
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel registros -->
+  <div id="checklist-registros" style="display:none;margin-top:1.5rem;max-width:900px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <div style="font-size:14px;font-weight:600;color:var(--c2);" id="checklist-reg-titulo"></div>
+      <button onclick="document.getElementById('checklist-registros').style.display='none'" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:18px;">✕</button>
+    </div>
+    <div id="checklist-reg-body" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:auto;max-height:420px;"></div>
   </div>
 </div>
 
@@ -3481,6 +3547,38 @@ function editarTransportista(envioId){
   document.getElementById('mt-matricula').value  = t.matricula||'';
   document.getElementById('mt-remolque').value   = t.remolque||'';
   document.getElementById('modal-trans-manual').classList.add('open');
+}
+
+// ── CHECKLISTS — ver registros ────────────────────────────────────────────────
+async function verRegistrosChecklist(tipo) {
+  const panel = document.getElementById('checklist-registros');
+  const titulo = document.getElementById('checklist-reg-titulo');
+  const body   = document.getElementById('checklist-reg-body');
+  titulo.textContent = (tipo==='LLEGADA' ? '🚛 Registros Check List Llegada' : '📦 Registros Check List Carga');
+  body.innerHTML = '<div style="padding:20px;color:var(--text2);font-size:13px;">⏳ Cargando...</div>';
+  panel.style.display = 'block';
+  try {
+    const url = getGsUrl();
+    const res  = await fetch(url, { method:'POST', body: JSON.stringify({ action: 'getChecklist', tipo }) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error||'Error');
+    const rows = data.data || [];
+    if (!rows.length) { body.innerHTML = '<div style="padding:20px;color:var(--text2);font-size:13px;">Sin registros todavía.</div>'; return; }
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    const cols = Object.keys(rows[0]);
+    html += '<thead><tr>' + cols.map(c=>`<th style="padding:8px 10px;text-align:left;background:var(--bg3);border-bottom:2px solid var(--border);font-weight:600;white-space:nowrap;">${c}</th>`).join('') + '</tr></thead><tbody>';
+    rows.forEach((r,i) => {
+      html += `<tr style="background:${i%2?'#f9fafc':'#fff'};">` + cols.map(c=>{
+        const v = r[c]||'';
+        if (String(v).startsWith('https://')) return `<td style="padding:7px 10px;border-bottom:1px solid var(--border);"><a href="${v}" target="_blank" style="color:var(--c1);">📎 Ver</a></td>`;
+        return `<td style="padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;">${v}</td>`;
+      }).join('') + '</tr>';
+    });
+    html += '</tbody></table>';
+    body.innerHTML = html;
+  } catch(err) {
+    body.innerHTML = `<div style="padding:20px;color:var(--urgent);font-size:13px;">❌ ${err.message}</div>`;
+  }
 }
 
 </script>
