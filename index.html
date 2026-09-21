@@ -81,11 +81,15 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tex
 
 /* TABLA PRINCIPAL */
 .table-wrapper{overflow-x:auto;}
-table{width:100%;border-collapse:collapse;font-size:13px;}
-thead th{text-align:left;padding:9px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);border-bottom:2px solid var(--border);font-weight:600;white-space:nowrap;background:var(--bg3);}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;}
+thead th{text-align:left;padding:9px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);font-weight:600;white-space:nowrap;background:var(--bg3);border-bottom:2px solid var(--border);box-shadow:inset 0 -2px 0 var(--border);}
 tbody td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
-tbody tr:hover td{background:rgba(46,109,164,0.04);}
+tbody tr:hover td{background:rgba(46,109,164,0.06);}
+tbody tr:nth-child(even) td{background:rgba(0,0,0,0.018);}
+tbody tr:nth-child(even):hover td{background:rgba(46,109,164,0.06);}
 tbody tr:last-child td{border-bottom:none;}
+/* Histórico sticky header */
+#tabla-historico thead th{position:sticky;top:0;z-index:20;background:var(--bg3);}
 
 /* ESTADO BADGES */
 .estado-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-block;}
@@ -1171,7 +1175,7 @@ function editarTransportista(envioId){
       </div>
     </div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:8px;" id="hist-count"></div>
-    <div class="table-wrapper" style="overflow-x:scroll;overflow-y:auto;max-height:70vh;">
+    <div class="table-wrapper" style="overflow-x:auto;overflow-y:auto;max-height:72vh;position:relative;border:1px solid var(--border);border-radius:var(--radius);">
       <table id="tabla-historico" style="min-width:1400px;">
         <thead>
           <tr>
@@ -2272,7 +2276,12 @@ function initSAP(){
   }
 }
 
-function procesarSAP(){
+async function procesarSAP(){
+  // Asegurar que el histórico esté cargado antes de verificar
+  if(!_histData.length && !_histCache.length){
+    document.getElementById('sap-result').innerHTML='<span style="color:var(--text3);font-size:13px;">⏳ Cargando histórico...</span>';
+    try{ await loadHist(); }catch(ex){}
+  }
   try {
     var filas=[];
     document.querySelectorAll('#sap-rows-body tr').forEach(function(tr){
@@ -2284,67 +2293,87 @@ function procesarSAP(){
     function norm(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,'').replace(/^0+(?=[1-9])/,''); }
     function normPz(s){ s=String(s||'').trim().replace(/\./g,'').replace(/,/g,'.'); return parseFloat(s)||0; }
 
-    // Construir índice desde _enviosCache
+    // Construir índice desde _enviosCache (activos) + _histData/_histCache (histórico)
     var idx=[];
-    var envios=(_enviosCache||[]).concat(_histCache||[]);
-    envios.forEach(function(e){
+    var activos=(_enviosCache||[]);
+    var historico=(_histData&&_histData.length?_histData:(_histCache||[]));
+
+    function indexarEnvio(e, fuente){
       var cs=((e.consegnas||[e.consegna]).filter(Boolean).join(', '))||'—';
-      var info={consegna:cs,cliente:e.cliente||'—',refcarga:e.refcarga||'—',estado:e.estado||'—'};
+      var tr2=e.transportista||{};
+      var info={
+        consegna:cs, cliente:e.cliente||'—', refcarga:e.refcarga||'—',
+        estado:e.estado||'—', fentrega:e.fentrega||'', fcarga:e.fcarga||'',
+        conductor:tr2.conductor||'', empresa:tr2.empresa||'',
+        fuente:fuente  // 'activo' | 'historico'
+      };
       if(e.articulos&&e.articulos.length){
         e.articulos.forEach(function(a){
-          if(a.orden) idx.push({tipo:'art',k:norm(a.orden),lin:norm(a.linea||''),pz:normPz(a.pz),info:info});
+          if(a.orden)    idx.push({tipo:'art',k:norm(a.orden),   lin:norm(a.linea||''),pz:normPz(a.pz),info:info});
           if(a.articulo) idx.push({tipo:'art',k:norm(a.articulo),lin:norm(a.linea||''),pz:normPz(a.pz),info:info});
         });
       }
       (e.consegnas||[e.consegna]).filter(Boolean).forEach(function(c){
-        idx.push({tipo:'cs',k:norm(c),lin:'',pz:normPz(e.pallets),info:info});
+        idx.push({tipo:'cs', k:norm(c),       lin:'',pz:normPz(e.pallets),info:info});
       });
       if(e.refcarga) idx.push({tipo:'ref',k:norm(e.refcarga),lin:'',pz:normPz(e.pallets),info:info});
-    });
+    }
+    activos.forEach(function(e){ indexarEnvio(e,'activo'); });
+    historico.forEach(function(e){ indexarEnvio(e,'historico'); });
 
     var html='<div style="background:#e8f0fb;border:1px solid #c8d8ee;border-radius:6px;padding:6px 12px;margin-bottom:8px;font-size:11px;color:#1a3d5c">';
-    html+='Envios activos: <b>'+(_enviosCache||[]).length+'</b> · ';
+    html+='Envíos activos: <b>'+activos.length+'</b> · ';
+    html+='Histórico: <b>'+historico.length+'</b> · ';
     html+='Artículos indexados: <b>'+idx.filter(function(x){return x.tipo==='art';}).length+'</b>';
-    if(idx.filter(function(x){return x.tipo==='art';}).length>0){
-      html+=' · Primeros órdenes: '+idx.filter(function(x){return x.tipo==='art';}).slice(0,4).map(function(x){return x.k;}).join(', ');
-    }
     html+='</div>';
 
     html+='<div style="overflow-x:auto"><table class="sap-table" style="width:100%">';
-    html+='<thead><tr><th>Origine</th><th>Posizione</th><th>Pzs SAP</th><th>Pzs App</th><th>Consegna</th><th>Cliente</th><th>OT</th><th>Estado</th><th>Resultado</th></tr></thead><tbody>';
+    html+='<thead><tr><th>Origine</th><th>Posizione</th><th>Pzs SAP</th><th>Pzs App</th><th>Consegna</th><th>Cliente</th><th>OT</th><th>Estado</th><th>F.Entrega</th><th>Fuente</th><th>Resultado</th></tr></thead><tbody>';
 
     filas.forEach(function(f){
       var origN=norm(f.orig), posN=norm(f.pos);
       var art=null;
-      // Búsqueda: orden+línea
+      // 1. orden+línea exacto
       for(var i=0;i<idx.length;i++){if(idx[i].tipo==='art'&&idx[i].k===origN&&posN&&idx[i].lin===posN){art=idx[i];break;}}
-      // Solo orden
+      // 2. solo orden exacto
       if(!art) for(var i=0;i<idx.length;i++){if(idx[i].tipo==='art'&&idx[i].k===origN){art=idx[i];break;}}
-      // Cualquier campo
+      // 3. consegna o refcarga exacta
       if(!art) for(var i=0;i<idx.length;i++){if(idx[i].k===origN){art=idx[i];break;}}
-      // Parcial
+      // 4. coincidencia parcial (mínimo 4 chars)
       if(!art&&origN.length>=4) for(var i=0;i<idx.length;i++){if(idx[i].k.indexOf(origN)>=0||origN.indexOf(idx[i].k)>=0){art=idx[i];break;}}
 
-      var estado='no',pzApp='—',info={};
+      var resultado='no', pzApp='—', info={fuente:''};
       if(art){
         pzApp=art.pz>0?String(art.pz):'—'; info=art.info;
         if(f.pz){
           var sn=normPz(f.pz);
-          estado=(Math.abs(sn-art.pz)<1)?'si':'piezas';
-        } else { estado='si'; }
+          resultado=(Math.abs(sn-art.pz)<1)?'si':'piezas';
+        } else { resultado='si'; }
       }
-      var cls={si:'coin-si',no:'coin-no',piezas:'coin-warn'}[estado]||'coin-no';
-      var lbl={si:'✅ Coincide',no:'❌ No encontrado',piezas:'⚠️ Piezas distintas'}[estado]||'❌';
-      var col=estado==='piezas'?'color:var(--urgent)':'';
+
+      var cls={si:'coin-si',no:'coin-no',piezas:'coin-warn'}[resultado]||'coin-no';
+      var lbl={si:'✅ Coincide',no:'❌ No encontrado',piezas:'⚠️ Piezas distintas'}[resultado]||'❌';
+      var colPz=resultado==='piezas'?'color:var(--urgent)':'';
+
+      // Badge de fuente
+      var fuenteBadge='';
+      if(info.fuente==='activo'){
+        fuenteBadge='<span style="background:#ddf0ff;color:#0050a0;border:1px solid #80c0f0;border-radius:12px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;">🟢 Activo</span>';
+      } else if(info.fuente==='historico'){
+        fuenteBadge='<span style="background:#e8f5e9;color:#1b5e20;border:1px solid #80c880;border-radius:12px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;">📋 Histórico</span>';
+      }
+
       html+='<tr>';
       html+='<td style="font-family:monospace;padding:7px 10px;font-weight:600">'+f.orig+'</td>';
-      html+='<td style="padding:7px 10px;font-family:monospace">'+( f.pos||'—')+'</td>';
-      html+='<td style="padding:7px 10px;font-family:monospace;font-weight:600">'+( f.pz||'—')+'</td>';
-      html+='<td style="padding:7px 10px;font-family:monospace;font-weight:600;'+col+'">'+pzApp+'</td>';
+      html+='<td style="padding:7px 10px;font-family:monospace">'+(f.pos||'—')+'</td>';
+      html+='<td style="padding:7px 10px;font-family:monospace;font-weight:600">'+(f.pz||'—')+'</td>';
+      html+='<td style="padding:7px 10px;font-family:monospace;font-weight:600;'+colPz+'">'+pzApp+'</td>';
       html+='<td style="padding:7px 10px;font-family:monospace;font-size:11px">'+(info.consegna||'—')+'</td>';
       html+='<td style="padding:7px 10px;font-size:11px">'+(info.cliente||'—')+'</td>';
       html+='<td style="padding:7px 10px;font-family:monospace;font-size:11px;color:var(--c2)">'+(info.refcarga||'—')+'</td>';
       html+='<td style="padding:7px 10px;font-size:11px">'+(info.estado||'—')+'</td>';
+      html+='<td style="padding:7px 10px;font-size:11px;color:var(--text2)">'+(info.fentrega||'—')+'</td>';
+      html+='<td style="padding:7px 10px">'+fuenteBadge+'</td>';
       html+='<td style="padding:7px 10px" class="'+cls+'">'+lbl+'</td>';
       html+='</tr>';
     });
